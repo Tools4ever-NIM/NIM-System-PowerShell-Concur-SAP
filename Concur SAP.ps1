@@ -913,8 +913,6 @@ function Idm-identity_users_emailRemove {
             })
         }
 
-        [void]$body.Operations.Add($newObj)
-
         $splat = @{
             SystemParams = $system_params
             Method = "PATCH"
