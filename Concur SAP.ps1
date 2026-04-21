@@ -459,7 +459,7 @@ function Idm-identity_userCreate {
                         if ($_.Type -eq 'object') {
                             foreach ($field in $_.objectfields) {
                                 $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
-                                @{ name = "$($colPrefix)_$($field)"; allowance = 'optional' }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
                             }
                         } else {
                             @{ name = $_.name; allowance = 'optional' }
@@ -558,7 +558,7 @@ function Idm-identity_userUpdate {
                         if ($_.Type -eq 'object') {
                             foreach ($field in $_.objectfields) {
                                 $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
-                                @{ name = "$($colPrefix)_$($field)"; allowance = 'optional' }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
                             }
                         } else {
                             @{ name = $_.name; allowance = 'optional' }
@@ -649,31 +649,18 @@ function Idm-identity_userDelete {
             semantics = 'delete'
             parameters = @(
                 $Global:Properties.$Class |
-                    Where-Object { $_.options -contains 'delete_m' } |
+                    Where-Object { $_.options -contains 'key' } |
                     ForEach-Object {
                         @{ name = $_.name; allowance = 'mandatory' }
                     }
 
                 $Global:Properties.$Class |
-                    Where-Object { $_.options -contains 'delete_o' } |
+                    Where-Object { -not ( $_.options -contains 'key') } |
                     ForEach-Object {
                         if ($_.Type -eq 'object') {
                             foreach ($field in $_.objectfields) {
                                 $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
-                                @{ name = "$($colPrefix)_$($field)"; allowance = 'optional' }
-                            }
-                        } else {
-                            @{ name = $_.name; allowance = 'optional' }
-                        }
-                    }
-
-                $Global:Properties.$Class |
-                    Where-Object { -not ( $_.options -contains 'delete_m' -or $_.options -contains 'delete_o' ) } |
-                    ForEach-Object {
-                        if ($_.Type -eq 'object') {
-                            foreach ($field in $_.objectfields) {
-                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
-                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'prohibited' }
                             }
                         } else {
                             @{ name = $_.name; allowance = 'prohibited' }
