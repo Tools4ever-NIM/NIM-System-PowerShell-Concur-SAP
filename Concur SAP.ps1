@@ -29,24 +29,24 @@ $Global:TravelUsers_CustomFields = [System.Collections.ArrayList]@()
 $Properties = @{
     IdentityUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
-        @{ name = 'active';            type = 'boolean';   objectfields = $null;             options = @('default','create_m') }
+        @{ name = 'active';            type = 'boolean';   objectfields = $null;             options = @('default','create_m','update_o') }
         @{ name = 'addresses';            type = 'table';   objectfields = $null;             options = @('default') }
-        @{ name = 'dateOfBirth';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
-        @{ name = 'displayName';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
+        @{ name = 'dateOfBirth';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
+        @{ name = 'displayName';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
         @{ name = 'emails';            type = 'table';   objectfields = $null;             options = @('default') }
         @{ name = 'emergencyContacts';            type = 'table';   objectfields = $null;           options = @('default') }
         @{ name = 'entitlements';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'externalId';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
         @{ name = 'localeOverrides';            type = 'object';   objectfields = @("preferenceEndDayViewHour","preferenceFirstDayOfWeek","preferenceDateFormat","preferenceCurrencySymbolLocation","preferenceHourMinuteSeparator","preferenceDistance","preferenceDefaultCalView","preference24Hour","preferenceNumberFormat","preferenceStartDayViewHour","preferenceNegativeCurrencyFormat","preferenceNegativeNumberFormat");             options = @('default') }
         @{ name = 'meta';            type = 'object';   objectfields = @("resourceType","created","lastModified","version","location");             options = @('default') }
-        @{ name = 'name';            type = 'object';   objectfields = @("honorificSuffix","formatted","familyName","givenName","familyNamePrefix","honorificPrefix","middleName");             options = @('default','create_o') }
-        @{ name = 'nickname';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
+        @{ name = 'name';            type = 'object';   objectfields = @("honorificSuffix","formatted","familyName","givenName","familyNamePrefix","honorificPrefix","middleName");             options = @('default','create_o','update_o') }
+        @{ name = 'nickname';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
         @{ name = 'phoneNumbers';            type = 'table';   objectfields = $null;             options = @('default') }
-        @{ name = 'preferredLanguage';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
-        @{ name = 'timezone';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
-        @{ name = 'title';            type = 'string';   objectfields = $null;             options = @('default','create_o') }
-        @{ name = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';            type = 'object';   objectfields = @("terminationDate","companyId","department","organization","manager.value","manager.employeeNumber","costCenter","startDate","leavesOfAbsence","employeeNumber");             options = @('default','create_o'); alias = 'EnterpriseUser' }
-        @{ name = 'username';            type = 'string';   objectfields = $null;             options = @('default','create_m') }
+        @{ name = 'preferredLanguage';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
+        @{ name = 'timezone';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
+        @{ name = 'title';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
+        @{ name = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';            type = 'object';   objectfields = @("terminationDate","companyId","department","organization","manager.value","manager.employeeNumber","costCenter","startDate","leavesOfAbsence","employeeNumber");             options = @('default','create_o','update_o'); alias = 'EnterpriseUser' }
+        @{ name = 'username';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_o') }
     )
     IdentityUser_Address = @(
         @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
@@ -522,6 +522,184 @@ function Idm-identity_userCreate {
         LogIO info "identityUserCreate" -out $response
         $function_params
         
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-identity_userUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'IdentityUser'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'key' -or $_.options -contains 'update_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'update_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'update_m' -or $_.options -contains 'update_o' -or $_.options -contains 'optional' -or $_.options.Contains('key') ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/identity/v4.1/Users/{0}" -f $function_params.id            
+        
+        $alias = "{0}_" -f ($Global:Properties.$Class | ? { $_.Name -eq 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'}).Alias
+        $body = [PSObject]@{
+            'Operations' = [System.Collections.ArrayList]@()
+        }
+
+        foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
+            if($prop.Name -eq 'id') { continue }
+
+            if($prop.Name.StartsWith($alias)) {
+                $fieldname = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:{0}' -f $prop.Name.replace($alias,'')
+            } elseif($prop.Name.StartsWith("name_")) {
+                $fieldname = ($prop.Name.Replace("name_",''))
+            } else {
+                $fieldname = $prop.Name
+            }
+            
+            [void]$body.Operations.Add([PSObject]@{
+                'op' ='replace'
+                'path' = $fieldname
+                'value' = $prop.Value
+            })
+        }
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json)
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "identityUserUpdate" -out $response
+        $function_params
+        
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-identity_userDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'IdentityUser'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'delete_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'delete_o' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'delete_m' -or $_.options -contains 'delete_o' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/identity/v4.1/Users/{0}" -f $function_params.id             
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "identityUserDelete" -out $response
     }
 
     Log verbose "Done"
@@ -1380,7 +1558,6 @@ function Execute-Request {
         }
 
         # Get next cursor
-        break
         $cursor = $response.nextCursor
 
     } while ($cursor)
