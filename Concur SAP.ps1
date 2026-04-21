@@ -58,11 +58,12 @@ $Properties = @{
         @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default') }
     )
     IdentityUser_Email = @(
-        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
+        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default','create_m','delete_m') }
         @{ name = 'verified';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'value';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'notifications';            type = 'boolean';   objectfields = $null;             options = @('default') }
+        @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default','create_m') }
+        @{ name = 'value';            type = 'string';   objectfields = $null;             options = @('default','create_m','delete_m') }
+        @{ name = 'notifications';            type = 'boolean';   objectfields = $null;             options = @('default','create_o') }
     )
     IdentityUser_EmergencyContact = @(
         @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
@@ -393,7 +394,8 @@ function Idm-identity_usersRead {
                         $globalVar = Get-Variable "IdentityUsers_$ucFirst" -Scope Global -ErrorAction SilentlyContinue
                             foreach($subItem in $prop.Value) {
                                 $table_template = [ordered]@{}
-                                $table_template['id'] = $item.id
+                                $table_template['id'] = Get-ObjectHash -Object $subItem
+                                $table_template['identityuser_id'] = $item.id
                                 foreach($subProperty in $subItem.PSObject.Properties) {
                                     $table_template[$subProperty.Name] = $subProperty.Value
                                 }
@@ -600,7 +602,7 @@ function Idm-identity_userUpdate {
             if($prop.Name.StartsWith($alias)) {
                 $fieldname = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:{0}' -f $prop.Name.replace($alias,'')
             } elseif($prop.Name.StartsWith("name_")) {
-                $fieldname = ($prop.Name.Replace("name_",''))
+                $fieldname = ($prop.Name.Replace("name_",'name.'))
             } else {
                 $fieldname = $prop.Name
             }
@@ -742,6 +744,190 @@ function Idm-identity_users_emailsRead {
         }
 
         $Global:IdentityUsers_Emails
+}
+
+function Idm-identity_users_emailAdd {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'IdentityUser_Email'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'create_m' -or $_.options -contains 'create_o' -or $_.options -contains 'optional' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/identity/v4.1/Users/{0}" -f $function_params.identityuser_id             
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'add'
+            'path' = 'emails'
+            'value' = @([PSObject]@{
+
+            })
+        }
+        
+        foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
+            if($prop.Name -eq 'identityuser_id') { continue }
+            $newObj.value[0].($prop.Name) = $prop.Value
+        }
+
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+    
+        $function_params.id = Get-ObjectHash -Object $function_params
+        LogIO info "identityUserEmailAdd" -out $function_params
+    }
+    
+    Log verbose "Done"
+}
+
+function Idm-identity_users_emailRemove {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'IdentityUser_Email'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'delete_m' -or $_.options -contains 'key'  } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'delete_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'delete_m' -or $_.options -contains 'delete_o' -or $_.options -contains 'optional' -or $_.options -contains 'key' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/identity/v4.1/Users/{0}" -f $function_params.identityuser_id             
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= @([PSObject]@{
+                'op' = 'remove'
+                'path' = 'emails[value eq "{0}"]' -f $function_params.value
+            })
+        }
+
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+
+        LogIO info "identityUserEmailRemove"
+    }
+    
+    Log verbose "Done"
 }
 
 function Idm-identity_users_emergencyContactsRead {
@@ -1626,4 +1812,32 @@ function Get-ClassMetaData {
             })
         }
     )
+}
+
+function Get-ObjectHash {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        $Object,
+
+        [ValidateSet("SHA256","SHA1","SHA384","SHA512","MD5")]
+        [string]$Algorithm = "SHA256",
+
+        [ValidateSet("Base64","Hex")]
+        [string]$Encoding = "Base64"
+    )
+
+    # Convert object → JSON → UTF8 bytes
+    $json  = $Object | ConvertTo-Json -Depth 100
+    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+
+    # Compute hash
+    $hasher = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
+    $hashBytes = $hasher.ComputeHash($bytes)
+
+    # Output format
+    switch ($Encoding) {
+        "Base64" { return [Convert]::ToBase64String($hashBytes) }
+        "Hex"    { return -join ($hashBytes | ForEach-Object { $_.ToString("x2") }) }
+    }
 }
