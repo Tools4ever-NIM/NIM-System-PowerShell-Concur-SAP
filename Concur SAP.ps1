@@ -91,7 +91,6 @@ $Properties = @{
     )
     SpendUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'schemas';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'meta';            type = 'object';   objectfields = @("resourceType","created","lastModified","version","location");             options = @('default') }
         @{ name = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User';            type = 'object';   objectfields = @("reimbursementCurrency","reimbursementType","ledgerCode","country","budgetCountryCode","stateProvince","locale","cashAdvanceAccountCode","testEmployee","nonEmployee","biManager.value");             options = @('default','update_o'); alias = 'SpendUser' }
@@ -102,25 +101,23 @@ $Properties = @{
     )
     SpendUser_CustomData = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'spenduser_id';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'value';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_m') }
+        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_m') }
+        @{ name = 'value';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_m') }
         @{ name = 'syncGuid';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'href';            type = 'string';   objectfields = $null;             options = @('default') }
     )
     SpendUser_Approver = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
-        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default','key') }
-        @{ name = 'spenduser_id';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'approver_value';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'primary';            type = 'boolean';   objectfields = $null;             options = @('default') }
     )
     SpendUser_ApproverLimit = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
-        @{ name = 'spenduser_id';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'approvalGroup';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'approvalLimit';            type = 'string';   objectfields = $null;             options = @('default') }
@@ -131,7 +128,7 @@ $Properties = @{
     SpendUser_Delegate = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'spenduser_id';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'canApprove';            type = 'boolean';   objectfields = $null;             options = @('default') }
         @{ name = 'canPrepare';            type = 'boolean';   objectfields = $null;             options = @('default') }
@@ -144,20 +141,19 @@ $Properties = @{
         @{ name = 'canViewReceipt';            type = 'boolean';   objectfields = $null;             options = @('default') }
         @{ name = 'delegate_value';            type = 'string';   objectfields = $null;             options = @('default') }
     )
-    SpendUser_Roles = @(
+    SpendUser_Role = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }
-        @{ name = 'spenduser_id';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'roleName';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default','add_m','remove_m') }
+        @{ name = 'roleName';            type = 'string';   objectfields = $null;             options = @('default','add_m','remove_m') }
+        @{ name = 'roleGroups';            type = 'string';   objectfields = $null;             options = @('default') }
     )
     TravelUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'urn:ietf:params:scim:schemas:extension:travel:2.0:User';            type = 'object';   objectfields = @("ruleClass.name","ruleClass.id","travelCrsName","name.namePrefix","name.givenName","name.hasNoMiddleName","name.middleName","name.familyName","name.honorificSuffix","travelNameRemark","gender","orgUnit","manager.value","manager.employeeNumber","groups","eReceiptOptIn" );             options = @('default'); alias = 'TravelUser' }
     )
     TravelUser_CustomField = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }        
-        @{ name = 'identityuser_id';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default') }        
         @{ name = 'traveluser_id';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'name';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'value';            type = 'string';   objectfields = $null;             options = @('default') }
@@ -376,7 +372,13 @@ function Idm-identity_usersRead {
                 }
 
                 $response = Execute-Request @splat
-                [void]$Global:IdentityUsers.AddRange(@() + $response)
+                #[void]$Global:IdentityUsers.AddRange(@() + $response)
+
+                foreach($item in $response) {
+                    if($item.id -ne '03538f9a-dffa-4450-a149-0f39272b0ed5') { continue } #TESTING
+
+                    [void]$Global:IdentityUsers.Add($item)
+                }
             }
 
             # Precompute property template
@@ -1084,7 +1086,7 @@ function Idm-identity_users_phoneNumberAdd {
         
         $response = Execute-Request @splat
     
-        $function_params.id = Get-ObjectHash -Object $function_params
+        $function_params.nim_id = Get-ObjectHash -Object $function_params
         LogIO info "identityUserPhoneNumberAdd" -out $function_params
     }
     
@@ -1272,7 +1274,6 @@ function Idm-spend_usersRead {
 
                     $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
                     $row.'nim_id' = Get-ObjectHash -Object $response
-                    $row.identityuser_id = $item.id
 
                     $itemResult.rawResult = $response
 
@@ -1471,7 +1472,7 @@ function Idm-spend_userUpdate {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        $uri = "profile/v4/Users/{0}" -f $function_params.id            
+        $uri = "profile/v4/Users/{0}" -f $function_params.id
         
         $body = [PSObject]@{
             'Operations' = [System.Collections.ArrayList]@()
@@ -1516,7 +1517,7 @@ function Idm-spend_userUpdate {
     Log verbose "Done"
 }
 
-function Idm-spend_users_customDataRead {
+function Idm-spend_users_customDatasRead {
     param (
         # Mode
         [switch] $GetMeta,    
@@ -1540,6 +1541,185 @@ function Idm-spend_users_customDataRead {
         }
 
         $Global:SpendUsers_CustomData
+}
+
+function Idm-spend_users_customDataCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser_CustomData'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'create_m' -or $_.options -contains 'create_o' -or $_.options -contains 'optional' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'replace'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:customData[id eq "{0}"].value' -f $function_params.id
+            'value' = $function_params.value
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+    
+        $function_params.nim_id = Get-ObjectHash -Object $function_params
+        LogIO info "spendUserCustomDataCreate" -out $function_params
+    }
+    
+    Log verbose "Done"
+}
+
+function Idm-spend_users_customDataUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser_CustomData'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'update_m' -or $_.options -contains 'key' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'update_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'update_m' -or $_.options -contains 'update_o' -or $_.options -contains 'optional' -or $_.options -contains 'key' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'replace'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:customData[id eq "{0}"].value' -f $function_params.id
+            'value' = $function_params.value
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "spendUserCustomDataUpdate" -out $function_params
+    }
+    
+    Log verbose "Done"
 }
 
 function Idm-spend_users_approverRead {
@@ -1629,7 +1809,7 @@ function Idm-spend_users_rolesRead {
     )
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
-        $Class = 'SpendUser_Roles'
+        $Class = 'SpendUser_Role'
         
         if ($GetMeta) {
             Get-ClassMetaData -SystemParams $SystemParams -Class $Class
@@ -1642,6 +1822,189 @@ function Idm-spend_users_rolesRead {
         }
 
         $Global:SpendUsers_Roles
+}
+
+function Idm-spend_users_roleAdd {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser_Role'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'add_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'add_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'add_m' -or $_.options -contains 'add_o' -or $_.options -contains 'optional' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'add'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:Role:roles'
+            'value' = @(
+                [PSObject]@{
+                    'roleName' = $function_params.roleName
+                }
+            )
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+    
+        $function_params.nim_id = Get-ObjectHash -Object $function_params
+        LogIO info "spendUserCustomDataCreate" -out $function_params
+    }
+    
+    Log verbose "Done"
+}
+
+function Idm-spend_users_roleRemove {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser_Role'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'remove_m' -or $_.options -contains 'key'  } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'remove_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'remove_m' -or $_.options -contains 'remove_o' -or $_.options -contains 'optional' -or $_.options -contains 'key' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id          
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+
+        $newObj = [PSObject]@{
+            'op' = 'remove'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:Role:roles[roleName eq "{0}"]' -f $function_params.roleName
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+
+        LogIO info "identityUserEmailRemove"
+    }
+    
+    Log verbose "Done"
 }
 
 function Idm-travel_usersRead {
@@ -1739,7 +2102,6 @@ function Idm-travel_usersRead {
                     }
 
                     $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
-                    $row.identityuser_id = $item.id
 
                     $itemResult.rawResult = $response
 
@@ -1788,7 +2150,7 @@ function Idm-travel_usersRead {
                 # Custom Fields
                 foreach($subItem in $output.rawResult.'urn:ietf:params:scim:schemas:extension:travel:2.0:User'.customFields) {
                     [void]$Global:TravelUsers_CustomFields.Add([PSCustomObject]@{
-                        spendUser_id = $item.id
+                        travelUser_id = $item.id
                         name = $subItem.name
                         value = $subItem.Value
                     })
