@@ -27,6 +27,19 @@ $Global:TravelUsers = [System.Collections.ArrayList]@()
 $Global:TravelUsers_CustomFields = [System.Collections.ArrayList]@()
 
 $Properties = @{
+    FormField = @(
+        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
+        @{ name = 'access';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'controlType';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'dataType';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'isCustom';            type = 'boolean';   objectfields = $null;             options = @('default') }
+        @{ name = 'isRequired';            type = 'boolean';   objectfields = $null;             options = @('default') }
+        @{ name = 'label';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'maxLength';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'name';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'schemas';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'sequence';            type = 'string';   objectfields = $null;             options = @('default') }
+    )
     IdentityUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
         @{ name = 'active';            type = 'boolean';   objectfields = $null;             options = @('default','create_m','update_o') }
@@ -89,6 +102,19 @@ $Properties = @{
         @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default','add_m') }
         @{ name = 'value';            type = 'string';   objectfields = $null;             options = @('default','add_m','delete_m') }
     )
+    Role = @(
+        @{ name = 'roleCode';            type = 'string';   objectfields = $null;             options = @('default','key') }
+        @{ name = 'type';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'roleFullName';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'description';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'groupAware';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'isProductArea';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'productAreas';            type = 'string';   objectfields = $null;             options = @('default') }
+    )
+    SpendCategoryCode = @(
+        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
+        @{ name = 'name';            type = 'string';   objectfields = $null;             options = @('default') }
+    )
     SpendUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
         @{ name = 'schemas';            type = 'string';   objectfields = $null;             options = @('default') }
@@ -149,7 +175,7 @@ $Properties = @{
     )
     TravelUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'urn:ietf:params:scim:schemas:extension:travel:2.0:User';            type = 'object';   objectfields = @("ruleClass.name","ruleClass.id","travelCrsName","name.namePrefix","name.givenName","name.hasNoMiddleName","name.middleName","name.familyName","name.honorificSuffix","travelNameRemark","gender","orgUnit","manager.value","manager.employeeNumber","groups","eReceiptOptIn" );             options = @('default'); alias = 'TravelUser' }
+        @{ name = 'urn:ietf:params:scim:schemas:extension:travel:2.0:User';            type = 'object';   objectfields = @("ruleClass.name","ruleClass.id","travelCrsName","name.namePrefix","name.givenName","name.hasNoMiddleName","name.middleName","name.familyName","name.honorificSuffix","travelNameRemark","gender","orgUnit","manager.value","manager.employeeNumber","groups","eReceiptOptIn" );             options = @('default','update_o'); alias = 'TravelUser' }
     )
     TravelUser_CustomField = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
@@ -338,6 +364,69 @@ function Idm-OnUnload {
 #
 # Object CRUD functions
 #
+function Idm-formFieldsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'FormField'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+            $uri = "profile/spend/v4.1/FormFields "             
+        
+            $splat = @{
+                SystemParams = $system_params
+                Method = "GET"
+                Uri = $uri                    
+            }
+
+            $response = Execute-Request @splat
+            
+            # Precompute property template
+            $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+            
+            $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+            $template = [ordered]@{}
+            foreach ($prop in $properties.Name) {
+                if($propertiesHT[$prop].Type -eq 'object') {
+                    $colPrefix = if ($propertiesHT[$prop].alias) { $propertiesHT[$prop].alias } else { $prop }
+                    foreach($path in $propertiesHT[$prop].objectfields) {
+                        $template["$($colPrefix)_$($path.Replace('.','_'))"] = $null
+                    }
+                    continue
+                }
+
+                $colName = if ($propertiesHT[$prop].alias) { $propertiesHT[$prop].alias } else { $prop }
+                $template[$colName] = $null
+            }
+
+            foreach($item in $response.Resources) {
+                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                foreach($prop in $item.PSObject.Properties) {
+                    $schemaProp = $propertiesHT[$prop.Name]
+
+                    if ($null -ne $schemaProp -and $properties.Name.Contains($prop.Name)) {
+                        $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
+                        $row.($colName) = $prop.Value
+                    }
+                    
+                }
+                $row
+
+                
+            }
+        }
+}
 
 function Idm-identity_usersRead {
     param (
@@ -372,13 +461,7 @@ function Idm-identity_usersRead {
                 }
 
                 $response = Execute-Request @splat
-                #[void]$Global:IdentityUsers.AddRange(@() + $response)
-
-                foreach($item in $response) {
-                    if($item.id -ne '03538f9a-dffa-4450-a149-0f39272b0ed5') { continue } #TESTING
-
-                    [void]$Global:IdentityUsers.Add($item)
-                }
+                [void]$Global:IdentityUsers.AddRange(@() + $response)
             }
 
             # Precompute property template
@@ -1178,6 +1261,150 @@ function Idm-identity_users_phoneNumberRemove {
     Log verbose "Done"
 }
 
+function Idm-rolesRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'Role'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+            $uri = "profile/spend/v4/Users/roleCodes"             
+        
+            $splat = @{
+                SystemParams = $system_params
+                Method = "GET"
+                Uri = $uri                    
+            }
+
+            $response = Execute-Request @splat
+            
+            # Precompute property template
+            $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+            
+            $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+            $template = [ordered]@{}
+            foreach ($prop in $properties.Name) {
+                if($propertiesHT[$prop].Type -eq 'object') {
+                    $colPrefix = if ($propertiesHT[$prop].alias) { $propertiesHT[$prop].alias } else { $prop }
+                    foreach($path in $propertiesHT[$prop].objectfields) {
+                        $template["$($colPrefix)_$($path.Replace('.','_'))"] = $null
+                    }
+                    continue
+                }
+
+                $colName = if ($propertiesHT[$prop].alias) { $propertiesHT[$prop].alias } else { $prop }
+                $template[$colName] = $null
+            }
+
+            foreach($area in $response.PSObject.Properties) {
+                foreach($item in $area.Value) {
+                    $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                    $row.type = $area.Name
+                    foreach($prop in $item.PSObject.Properties) {
+                        $schemaProp = $propertiesHT[$prop.Name]
+
+                        if ($null -ne $schemaProp -and $properties.Name.Contains($prop.Name)) {
+                            $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
+                            $row.($colName) = $prop.Value
+                        }
+                        
+                    }
+
+                    $row
+                }
+
+            }
+        }
+}
+
+function Idm-spendCategoryCodesRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'SpendCategoryCode'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            return
+        }
+
+        $items = @(
+            [pscustomobject]@{ ID = 'ABFEE'; Name = 'Agent/Booking Fees' }
+            [pscustomobject]@{ ID = 'ACCNT'; Name = 'Accounting' }
+            [pscustomobject]@{ ID = 'ADVTG'; Name = 'Advertising/Marketing' }
+            [pscustomobject]@{ ID = 'AIRFE'; Name = 'Airline Fees' }
+            [pscustomobject]@{ ID = 'AIRFR'; Name = 'Airfare' }
+            [pscustomobject]@{ ID = 'CARRT'; Name = 'Car Rental' }
+            [pscustomobject]@{ ID = 'CARXX'; Name = 'Car Related' }
+            [pscustomobject]@{ ID = 'CASHA'; Name = 'Cash Advance - Not Partially Approvable' }
+            [pscustomobject]@{ ID = 'CASHN'; Name = 'Cash Advance - Standard' }
+            [pscustomobject]@{ ID = 'COCAR'; Name = 'Company Car - Fixed Expense' }
+            [pscustomobject]@{ ID = 'COCRM'; Name = 'Company Car - Mileage Reimbursement' }
+            [pscustomobject]@{ ID = 'COMPU'; Name = 'Computer' }
+            [pscustomobject]@{ ID = 'CONSL'; Name = 'Consulting Services' }
+            [pscustomobject]@{ ID = 'DONAT'; Name = 'Donations' }
+            [pscustomobject]@{ ID = 'ENTER'; Name = 'Entertainment' }
+            [pscustomobject]@{ ID = 'FACLT'; Name = 'Facility' }
+            [pscustomobject]@{ ID = 'FEESD'; Name = 'Fees/Dues' }
+            [pscustomobject]@{ ID = 'FINAN'; Name = 'Financial Services' }
+            [pscustomobject]@{ ID = 'GASXX'; Name = 'Gas' }
+            [pscustomobject]@{ ID = 'GIFTS'; Name = 'Gifts' }
+            [pscustomobject]@{ ID = 'GOODW'; Name = 'Goodwill' }
+            [pscustomobject]@{ ID = 'GRTRN'; Name = 'Ground Transportation' }
+            [pscustomobject]@{ ID = 'INCTA'; Name = 'Incidental - Count in Daily Incidental Allowance' }
+            [pscustomobject]@{ ID = 'INSUR'; Name = 'Insurance' }
+            [pscustomobject]@{ ID = 'JANTR'; Name = 'Janitorial' }
+            [pscustomobject]@{ ID = 'JGTRN'; Name = 'Ground Transportation - Japanese' }
+            [pscustomobject]@{ ID = 'LEGAL'; Name = 'Legal Services' }
+            [pscustomobject]@{ ID = 'LODGA'; Name = 'Lodging - Track Room Rate Spending' }
+            [pscustomobject]@{ ID = 'LODGN'; Name = 'Lodging - Do Not Track Room Rate Spending' }
+            [pscustomobject]@{ ID = 'LODGT'; Name = 'Lodging Tax' }
+            [pscustomobject]@{ ID = 'LODGX'; Name = 'Lodging' }
+            [pscustomobject]@{ ID = 'MEALA'; Name = 'Meal - Count in Daily Meal Allowance' }
+            [pscustomobject]@{ ID = 'MEALN'; Name = 'Meal - Do Not Count in Daily Meal Allowance' }
+            [pscustomobject]@{ ID = 'MEALS'; Name = 'Meal' }
+            [pscustomobject]@{ ID = 'MEETG'; Name = 'Meetings' }
+            [pscustomobject]@{ ID = 'MFUEL'; Name = 'Fuel For Mileage' }
+            [pscustomobject]@{ ID = 'OFFIC'; Name = 'Office Supplies' }
+            [pscustomobject]@{ ID = 'OSUPP'; Name = 'Other Supplies' }
+            [pscustomobject]@{ ID = 'OTHER'; Name = 'Other' }
+            [pscustomobject]@{ ID = 'PRCAR'; Name = 'Personal Car - Fixed Expense' }
+            [pscustomobject]@{ ID = 'PRCRM'; Name = 'Personal Car - Mileage Reimbursement' }
+            [pscustomobject]@{ ID = 'PRKNG'; Name = 'Personal Car - Parking Expense' }
+            [pscustomobject]@{ ID = 'PRNTG'; Name = 'Printing/Reproduction' }
+            [pscustomobject]@{ ID = 'PROFS'; Name = 'Professional Services' }
+            [pscustomobject]@{ ID = 'RAILX'; Name = 'Train' }
+            [pscustomobject]@{ ID = 'RENTL'; Name = 'Rent' }
+            [pscustomobject]@{ ID = 'SHIPG'; Name = 'Shipping' }
+            [pscustomobject]@{ ID = 'STAFF'; Name = 'Staffing' }
+            [pscustomobject]@{ ID = 'SUBSC'; Name = 'Subscription/Publication' }
+            [pscustomobject]@{ ID = 'TELEC'; Name = 'Telecom/Internet' }
+            [pscustomobject]@{ ID = 'TRADE'; Name = 'Trade/Convention' }
+            [pscustomobject]@{ ID = 'TRAIN'; Name = 'Training' }
+            [pscustomobject]@{ ID = 'UTLTS'; Name = 'Utilities' }
+        )
+
+        $items
+}
+
 function Idm-spend_usersRead {
     param (
         # Mode
@@ -1229,7 +1456,7 @@ function Idm-spend_usersRead {
 
             $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
             $runspacePool.Open()
-            $runspaces = @()
+            $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
             # Index for tracking
             $index = 0
@@ -1297,7 +1524,8 @@ function Idm-spend_usersRead {
                 }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($template).AddArgument($index).AddArgument($properties.Name).AddArgument($propertiesHT).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot)
 
                 $runspace.RunspacePool = $runspacePool
-                $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+                $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
+
                 $index++
             }
 
@@ -1305,104 +1533,106 @@ function Idm-spend_usersRead {
             $total = $runspaces.Count
             $completed = 0
 
-            foreach ($r in $runspaces) {
-                $output = $r.Pipe.EndInvoke($r.Status)
-                $completed++
+            while ($runspaces.Count -gt 0) {
+                $done = $runspaces | Where-Object { $_.Status.IsCompleted }
+                foreach ($r in $done) {
+                    $output = $r.Pipe.EndInvoke($r.Status)
+                    $completed++
 
-                if ($completed % 250 -eq 0 -or $completed -eq $total) {
-                    $percent = [math]::Round(($completed / $total) * 100, 2)
-                    Log info "Progress: [$completed/$total] requests completed ($percent%)"
+                    if ($completed % 250 -eq 0 -or $completed -eq $total) {
+                        $percent = [math]::Round(($completed / $total) * 100, 2)
+                        Log info "Progress: [$completed/$total] requests completed ($percent%)"
+                    }
+
+                    if($null -ne $output.logMessage) {
+                        Log verbose $output.logMessage
+                    }
+
+                    foreach($item in $output.rawResult) {
+                        
+                        # CustomData
+                        if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData.length -gt 0) {
+                            foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData) {
+                                [void]$Global:SpendUsers_CustomData.Add([PSCustomObject]@{
+                                    nim_id = Get-ObjectHash -Object $subItem
+                                    spendUser_id = $item.id
+                                    id = $subItem.id
+                                    value = $subItem.Value
+                                    syncGuid = $subItem.syncGuid
+                                    href = $subItem.href
+                                })
+                            }
+                        }
+                        
+                        
+                        # Approver
+                        if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report.length -gt 0) {
+                            foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report) {
+                                [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                    nim_id = Get-ObjectHash -Object $subItem
+                                    spendUser_id = $item.id
+                                    approver_value = $subItem.approver.value
+                                    primary = $subItem.primary
+                                })
+                            }
+                        }
+
+                        # Approver Limit
+                        foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:ApproverLimit'.PSObject.Properties) {
+                            foreach($subItem in $prop.Value) {
+                                [void]$Global:SpendUsers_ApproverLimit.Add([PSCustomObject]@{
+                                    nim_id = Get-ObjectHash -Object $subItem
+                                    spendUser_id = $item.id
+                                    type = $prop.Name
+                                    approvalGroup = $subItem.approvalGroup
+                                    approvalLimit = $subItem.approvalLimit
+                                    approvalType = $subItem.approvalType
+                                    exceptionApprovalAuthority = $subItem.exceptionApprovalAuthority
+                                    reimbursementCurrency = $subItem.reimbursementCurrency
+                                })
+                            }
+                        }
+                        
+                        # Delegate
+                        foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Delegate'.PSObject.Properties) {
+                            foreach($subItem in $prop.Value) {
+                                [void]$Global:SpendUsers_Delegate.Add([PSCustomObject]@{
+                                    nim_id = Get-ObjectHash -Object $subItem
+                                    spendUser_id = $item.id
+                                    type = $prop.Name
+                                    canApprove = $subItem.canApprove
+                                    canPrepare = $subItem.canPrepare
+                                    canPrepareForApproval = $subItem.canPrepareForApproval
+                                    canReceiveApprovalEmail = $subItem.canReceiveApprovalEmail
+                                    canReceiveEmail = $subItem.canReceiveEmail
+                                    canSubmit = $subItem.canSubmit
+                                    canSubmitTravelRequest = $subItem.canSubmitTravelRequest
+                                    canUseBi = $subItem.canUseBi
+                                    canViewReceipt = $subItem.canViewReceipt
+                                    delegate_value = $subItem.delegate.value
+                                })
+                            }
+                        }
+
+                        # Roles
+                        if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles.length -gt 0) {
+                            foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles) {
+                                [void]$Global:SpendUsers_Roles.Add([PSCustomObject]@{
+                                    nim_id = Get-ObjectHash -Object $subItem
+                                    spendUser_id = $item.id
+                                    roleName = $subItem.roleName
+                                    roleGroups = $subItem.roleGroups
+                                })
+                            }
+                        }
+                        
+                    }
+                    
+                    [void]$Global:SpendUsers.AddRange(@() + ($output.result | Select-Object $function_params.properties))
+
+                    $r.Pipe.Dispose()
+                    $runspaces.Remove($r)
                 }
-
-                if($null -ne $output.logMessage) {
-                    Log verbose $output.logMessage
-                }
-                
-
-
-                foreach($item in $output.rawResult) {
-                    
-                    # CustomData
-                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData.length -gt 0) {
-                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData) {
-                            [void]$Global:SpendUsers_CustomData.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
-                                spendUser_id = $item.id
-                                id = $subItem.id
-                                value = $subItem.Value
-                                syncGuid = $subItem.syncGuid
-                                href = $subItem.href
-                            })
-                        }
-                    }
-                    
-                    
-                    # Approver
-                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report.length -gt 0) {
-                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report) {
-                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
-                                spendUser_id = $item.id
-                                approver_value = $subItem.approver.value
-                                primary = $subItem.primary
-                            })
-                        }
-                    }
-
-                    # Approver Limit
-                    foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:ApproverLimit'.PSObject.Properties) {
-                        foreach($subItem in $prop.Value) {
-                            [void]$Global:SpendUsers_ApproverLimit.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
-                                spendUser_id = $item.id
-                                type = $prop.Name
-                                approvalGroup = $subItem.approvalGroup
-                                approvalLimit = $subItem.approvalLimit
-                                approvalType = $subItem.approvalType
-                                exceptionApprovalAuthority = $subItem.exceptionApprovalAuthority
-                                reimbursementCurrency = $subItem.reimbursementCurrency
-                            })
-                        }
-                    }
-                    
-                    # Delegate
-                    foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Delegate'.PSObject.Properties) {
-                        foreach($subItem in $prop.Value) {
-                            [void]$Global:SpendUsers_Delegate.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
-                                spendUser_id = $item.id
-                                type = $prop.Name
-                                canApprove = $subItem.canApprove
-                                canPrepare = $subItem.canPrepare
-                                canPrepareForApproval = $subItem.canPrepareForApproval
-                                canReceiveApprovalEmail = $subItem.canReceiveApprovalEmail
-                                canReceiveEmail = $subItem.canReceiveEmail
-                                canSubmit = $subItem.canSubmit
-                                canSubmitTravelRequest = $subItem.canSubmitTravelRequest
-                                canUseBi = $subItem.canUseBi
-                                canViewReceipt = $subItem.canViewReceipt
-                                delegate_value = $subItem.delegate.value
-                            })
-                        }
-                    }
-
-                    # Roles
-                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles.length -gt 0) {
-                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles) {
-                            [void]$Global:SpendUsers_Roles.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
-                                spendUser_id = $item.id
-                                roleName = $subItem.roleName
-                                roleGroups = $subItem.roleGroups
-                            })
-                        }
-                    }
-                    
-                }
-                
-                [void]$Global:SpendUsers.AddRange(@() + ($output.result | Select-Object $function_params.properties))
-
-                $r.Pipe.Dispose()
             }
 
             $runspacePool.Close()
@@ -1912,7 +2142,7 @@ function Idm-spend_users_roleAdd {
         $response = Execute-Request @splat
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
-        LogIO info "spendUserCustomDataCreate" -out $function_params
+        LogIO info "spendUserRoleAdd" -out $function_params
     }
     
     Log verbose "Done"
@@ -2001,7 +2231,7 @@ function Idm-spend_users_roleRemove {
         
         $response = Execute-Request @splat
 
-        LogIO info "identityUserEmailRemove"
+        LogIO info "spendUserRoleRemove"
     }
     
     Log verbose "Done"
@@ -2058,7 +2288,7 @@ function Idm-travel_usersRead {
 
             $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
             $runspacePool.Open()
-            $runspaces = @()
+            $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
             # Index for tracking
             $index = 0
@@ -2125,7 +2355,7 @@ function Idm-travel_usersRead {
                 }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($template).AddArgument($index).AddArgument($properties.Name).AddArgument($propertiesHT).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot)
 
                 $runspace.RunspacePool = $runspacePool
-                $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+                $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
                 $index++
             }
 
@@ -2133,32 +2363,36 @@ function Idm-travel_usersRead {
             $total = $runspaces.Count
             $completed = 0
 
-            foreach ($r in $runspaces) {
-                $output = $r.Pipe.EndInvoke($r.Status)
-                $completed++
+            while ($runspaces.Count -gt 0) {
+                $done = $runspaces | Where-Object { $_.Status.IsCompleted }
+                foreach ($r in $done) {
+                    $output = $r.Pipe.EndInvoke($r.Status)
+                    $completed++
 
-                if ($completed % 250 -eq 0 -or $completed -eq $total) {
-                    $percent = [math]::Round(($completed / $total) * 100, 2)
-                    Log info "Progress: [$completed/$total] requests completed ($percent%)"
-                }
+                    if ($completed % 250 -eq 0 -or $completed -eq $total) {
+                        $percent = [math]::Round(($completed / $total) * 100, 2)
+                        Log info "Progress: [$completed/$total] requests completed ($percent%)"
+                    }
 
-                if($null -ne $output.logMessage) {
-                    Log verbose $output.logMessage
-                }
-                
-                
-                # Custom Fields
-                foreach($subItem in $output.rawResult.'urn:ietf:params:scim:schemas:extension:travel:2.0:User'.customFields) {
-                    [void]$Global:TravelUsers_CustomFields.Add([PSCustomObject]@{
-                        travelUser_id = $item.id
-                        name = $subItem.name
-                        value = $subItem.Value
-                    })
-                }
+                    if($null -ne $output.logMessage) {
+                        Log verbose $output.logMessage
+                    }
+                    
+                    
+                    # Custom Fields
+                    foreach($subItem in $output.rawResult.'urn:ietf:params:scim:schemas:extension:travel:2.0:User'.customFields) {
+                        [void]$Global:TravelUsers_CustomFields.Add([PSCustomObject]@{
+                            travelUser_id = $item.id
+                            name = $subItem.name
+                            value = $subItem.Value
+                        })
+                    }
 
-                [void]$Global:TravelUsers.AddRange(@() + ($output.result | Select-Object $function_params.properties))
-                
-                $r.Pipe.Dispose()
+                    [void]$Global:TravelUsers.AddRange(@() + ($output.result | Select-Object $function_params.properties))
+                    
+                    $r.Pipe.Dispose()
+                    $runspaces.Remove($r)
+                }
             }
 
             $runspacePool.Close()
@@ -2166,6 +2400,111 @@ function Idm-travel_usersRead {
         }
 
         $Global:TravelUsers
+}
+
+function Idm-travel_userUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'TravelUser'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'key' -or $_.options -contains 'update_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'update_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'update_m' -or $_.options -contains 'update_o' -or $_.options -contains 'optional' -or $_.options.Contains('key') ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.id
+        
+        $body = [PSObject]@{
+            'Operations' = [System.Collections.ArrayList]@()
+        }
+        
+        $lookup = @{}
+        $Properties.TravelUser | Where-Object { $null -ne $_.alias} | ForEach-Object { $lookup[$_.alias] = $_.name }
+
+        foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
+            if($prop.Name -eq 'id') { continue }
+
+            $prefix = $prop.Name.split('_')[0]
+            $lookupValue = $lookup[$prefix]
+
+            if($lookupValue.length -gt 0) {
+                $fieldname = '{0}:{1}' -f $lookupValue, $prop.Name.replace("$($prefix)_",'')
+            } else {
+                $fieldname = $prop.Name
+            }
+            
+            [void]$body.Operations.Add([PSObject]@{
+                'op' ='replace'
+                'path' = $fieldname
+                'value' = $prop.Value
+            })
+        }
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json)
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "TravelUserUpdate" -out $response
+        $function_params
+        
+    }
+
+    Log verbose "Done"
 }
 
 function Idm-travel_users_customFieldsRead {
@@ -2192,6 +2531,185 @@ function Idm-travel_users_customFieldsRead {
         }
 
         $Global:TravelUsers_CustomFields
+}
+
+function Idm-travel_users_customFieldCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'TravelUser_CustomField'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'create_m' -or $_.options -contains 'create_o' -or $_.options -contains 'optional' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'replace'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:customData[id eq "{0}"].value' -f $function_params.id
+            'value' = $function_params.value
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+    
+        $function_params.nim_id = Get-ObjectHash -Object $function_params
+        LogIO info "spendUserCustomDataCreate" -out $function_params
+    }
+    
+    Log verbose "Done"
+}
+
+function Idm-travel_users_customFieldUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'TravelUser_CustomField'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'update_m' -or $_.options -contains 'key' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'update_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'update_m' -or $_.options -contains 'update_o' -or $_.options -contains 'optional' -or $_.options -contains 'key' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'replace'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:customData[id eq "{0}"].value' -f $function_params.id
+            'value' = $function_params.value
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "spendUserCustomDataUpdate" -out $function_params
+    }
+    
+    Log verbose "Done"
 }
 
 #
