@@ -12,6 +12,7 @@ $Log_MaskableKeys = @(
 
 $Global:AuthToken = $null
 $Global:Proxy = @{}
+$Global:ProxyInitialized = $false
 $Global:IdentityUsers = [System.Collections.ArrayList]@()
 $Global:IdentityUsers_Addresses = [System.Collections.ArrayList]@()
 $Global:IdentityUsers_Emails = [System.Collections.ArrayList]@()
@@ -359,6 +360,22 @@ function Idm-SystemInfo {
 }
 
 function Idm-OnUnload {
+    $Global:AuthToken = $null
+    $Global:Proxy = @{}
+    $Global:ProxyInitialized = $false
+    $Global:IdentityUsers.Clear()
+    $Global:IdentityUsers_Addresses.Clear()
+    $Global:IdentityUsers_Emails.Clear()
+    $Global:IdentityUsers_EmergencyContacts.Clear()
+    $Global:IdentityUsers_PhoneNumbers.Clear()
+    $Global:SpendUsers.Clear()
+    $Global:SpendUsers_CustomData.Clear()
+    $Global:SpendUsers_Delegate.Clear()
+    $Global:SpendUsers_Approver.Clear()
+    $Global:SpendUsers_ApproverLimit.Clear()
+    $Global:SpendUsers_Roles.Clear()
+    $Global:TravelUsers.Clear()
+    $Global:TravelUsers_CustomFields.Clear()
 }
 
 #
@@ -381,7 +398,7 @@ function Idm-formFieldsRead {
             Get-ClassMetaData -SystemParams $SystemParams -Class $Class
             
         } else {
-            $uri = "profile/spend/v4.1/FormFields "             
+            $uri = "profile/spend/v4.1/FormFields"
         
             $splat = @{
                 SystemParams = $system_params
@@ -410,12 +427,13 @@ function Idm-formFieldsRead {
                 $template[$colName] = $null
             }
 
+            $propertyNameSet = [System.Collections.Generic.HashSet[string]]::new([string[]]$properties.Name, [System.StringComparer]::Ordinal)
             foreach($item in $response.Resources) {
-                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                $row = [PSCustomObject]([ordered]@{} + $template)
                 foreach($prop in $item.PSObject.Properties) {
                     $schemaProp = $propertiesHT[$prop.Name]
 
-                    if ($null -ne $schemaProp -and $properties.Name.Contains($prop.Name)) {
+                    if ($null -ne $schemaProp -and $propertyNameSet.Contains($prop.Name)) {
                         $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
                         $row.($colName) = $prop.Value
                     }
@@ -461,7 +479,7 @@ function Idm-identity_usersRead {
                 }
 
                 $response = Execute-Request @splat
-                [void]$Global:IdentityUsers.AddRange(@() + $response)
+                [void]$Global:IdentityUsers.AddRange($response)
             }
 
             # Precompute property template
@@ -483,14 +501,21 @@ function Idm-identity_usersRead {
                 $template[$colName] = $null
             }
 
+            $propertyNameSet = [System.Collections.Generic.HashSet[string]]::new([string[]]$properties.Name, [System.StringComparer]::Ordinal)
+            $tableVarMap = @{
+                'Addresses'         = $Global:IdentityUsers_Addresses
+                'Emails'            = $Global:IdentityUsers_Emails
+                'EmergencyContacts' = $Global:IdentityUsers_EmergencyContacts
+                'PhoneNumbers'      = $Global:IdentityUsers_PhoneNumbers
+            }
             foreach($item in $Global:IdentityUsers) {
-                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                $row = [PSCustomObject]([ordered]@{} + $template)
                 foreach($prop in $item.PSObject.Properties) {
                     $schemaProp = $propertiesHT[$prop.Name]
 
                     if($schemaProp.Type -eq 'table') {
                         $ucFirst = $prop.Name.Substring(0,1).ToUpper() + $prop.Name.Substring(1)
-                        $globalVar = Get-Variable "IdentityUsers_$ucFirst" -Scope Global -ErrorAction SilentlyContinue
+                        $globalVar = $tableVarMap[$ucFirst]
                             foreach($subItem in $prop.Value) {
                                 $table_template = [ordered]@{}
                                 $table_template['nim_id'] = Get-ObjectHash -Object $subItem
@@ -498,7 +523,7 @@ function Idm-identity_usersRead {
                                 foreach($subProperty in $subItem.PSObject.Properties) {
                                     $table_template[$subProperty.Name] = $subProperty.Value
                                 }
-                                [void]$globalVar.Value.Add([PSCustomObject]$table_template)
+                                [void]$globalVar.Add([PSCustomObject]$table_template)
                             }
                         continue
                     }
@@ -518,7 +543,7 @@ function Idm-identity_usersRead {
                         continue
                     }
 
-                    if ($null -ne $schemaProp -and $properties.Name.Contains($prop.Name)) {
+                    if ($null -ne $schemaProp -and $propertyNameSet.Contains($prop.Name)) {
                         $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
                         $row.($colName) = $prop.Value
                     }
@@ -1307,14 +1332,15 @@ function Idm-rolesRead {
                 $template[$colName] = $null
             }
 
+            $propertyNameSet = [System.Collections.Generic.HashSet[string]]::new([string[]]$properties.Name, [System.StringComparer]::Ordinal)
             foreach($area in $response.PSObject.Properties) {
                 foreach($item in $area.Value) {
-                    $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                    $row = [PSCustomObject]([ordered]@{} + $template)
                     $row.type = $area.Name
                     foreach($prop in $item.PSObject.Properties) {
                         $schemaProp = $propertiesHT[$prop.Name]
 
-                        if ($null -ne $schemaProp -and $properties.Name.Contains($prop.Name)) {
+                        if ($null -ne $schemaProp -and $propertyNameSet.Contains($prop.Name)) {
                             $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
                             $row.($colName) = $prop.Value
                         }
@@ -1451,8 +1477,6 @@ function Idm-spend_usersRead {
 
             # Prepare runspace pool
             $cancellationSource = [System.Threading.CancellationTokenSource]::new()
-            $cancellationToken = $cancellationSource.Token
-            $system_params.CancellationSource = $cancellationSource
 
             $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
             $runspacePool.Open()
@@ -1466,18 +1490,20 @@ function Idm-spend_usersRead {
             $funcDef3 = "function Initialize-Proxy { $((Get-Command Initialize-Proxy -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef4 = "function Resolve-NestedValue { $((Get-Command Resolve-NestedValue -CommandType Function).ScriptBlock.ToString()) }"
 
+            # Capture once — stable for the entire sync
+            $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
+            $authTokenSnapshot       = $Global:AuthToken
+            $proxyInitializedSnapshot = $Global:ProxyInitialized
+
             foreach ($item in $Global:IdentityUsers) {
                 $runspace = [powershell]::Create()
 
-                # Capture values before entering the runspace
-                $proxySnapshot    = $Global:Proxy
-                $authTokenSnapshot = $Global:AuthToken
-
                 [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript($funcDef3).AddScript($funcDef4).AddScript({
-                    param($item, $system_params, $Class, $template, $index, $properties, $propertiesHT, $proxy, $authToken)
-                    
-                    $Global:Proxy = $proxy
-                    $Global:AuthToken = $authToken
+                    param($item, $system_params, $Class, $template, $index, $properties, $propertiesHT, $proxy, $authToken, $proxyInitialized)
+
+                    $Global:Proxy            = $proxy
+                    $Global:AuthToken        = $authToken
+                    $Global:ProxyInitialized = $proxyInitialized
 
                     $itemResult = @{
                         rawResult = $null
@@ -1491,15 +1517,16 @@ function Idm-spend_usersRead {
                         Uri = "profile/spend/v4.1/Users/$($item.id)"
                         LoggingEnabled = $false
                     }
-                    
+
                     try {
                         $response = Execute-Request @splat
                     } catch {
                         $itemResult.logMessage = "Retrieve User Info [$($item.id)] - $_"
                         return $itemResult
                     }
+                    $response = $response[0]
 
-                    $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                    $row = [PSCustomObject]([ordered]@{} + $template)
                     $row.'nim_id' = Get-ObjectHash -Object $response
 
                     $itemResult.rawResult = $response
@@ -1517,11 +1544,11 @@ function Idm-spend_usersRead {
                         $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
                         $row.($colName) = $prop.Value
                     }
-                    
+
                     $itemResult.result = $row
 
                     return $itemResult
-                }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($template).AddArgument($index).AddArgument($properties.Name).AddArgument($propertiesHT).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot)
+                }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($template).AddArgument($index).AddArgument($properties.Name).AddArgument($propertiesHT).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot).AddArgument($proxyInitializedSnapshot)
 
                 $runspace.RunspacePool = $runspacePool
                 $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
@@ -1534,8 +1561,10 @@ function Idm-spend_usersRead {
             $completed = 0
 
             while ($runspaces.Count -gt 0) {
-                $done = $runspaces | Where-Object { $_.Status.IsCompleted }
-                foreach ($r in $done) {
+                for ($i = $runspaces.Count - 1; $i -ge 0; $i--) {
+                    $r = $runspaces[$i]
+                    if (-not $r.Status.IsCompleted) { continue }
+
                     $output = $r.Pipe.EndInvoke($r.Status)
                     $completed++
 
@@ -1548,95 +1577,94 @@ function Idm-spend_usersRead {
                         Log verbose $output.logMessage
                     }
 
-                    foreach($item in $output.rawResult) {
-                        
-                        # CustomData
-                        if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData.length -gt 0) {
-                            foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData) {
-                                [void]$Global:SpendUsers_CustomData.Add([PSCustomObject]@{
-                                    nim_id = Get-ObjectHash -Object $subItem
-                                    spendUser_id = $item.id
-                                    id = $subItem.id
-                                    value = $subItem.Value
-                                    syncGuid = $subItem.syncGuid
-                                    href = $subItem.href
-                                })
-                            }
-                        }
-                        
-                        
-                        # Approver
-                        if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report.length -gt 0) {
-                            foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report) {
-                                [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                    nim_id = Get-ObjectHash -Object $subItem
-                                    spendUser_id = $item.id
-                                    approver_value = $subItem.approver.value
-                                    primary = $subItem.primary
-                                })
-                            }
-                        }
+                    $item = $output.rawResult
 
-                        # Approver Limit
-                        foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:ApproverLimit'.PSObject.Properties) {
-                            foreach($subItem in $prop.Value) {
-                                [void]$Global:SpendUsers_ApproverLimit.Add([PSCustomObject]@{
-                                    nim_id = Get-ObjectHash -Object $subItem
-                                    spendUser_id = $item.id
-                                    type = $prop.Name
-                                    approvalGroup = $subItem.approvalGroup
-                                    approvalLimit = $subItem.approvalLimit
-                                    approvalType = $subItem.approvalType
-                                    exceptionApprovalAuthority = $subItem.exceptionApprovalAuthority
-                                    reimbursementCurrency = $subItem.reimbursementCurrency
-                                })
-                            }
+                    # CustomData
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData) {
+                            [void]$Global:SpendUsers_CustomData.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                id = $subItem.id
+                                value = $subItem.Value
+                                syncGuid = $subItem.syncGuid
+                                href = $subItem.href
+                            })
                         }
-                        
-                        # Delegate
-                        foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Delegate'.PSObject.Properties) {
-                            foreach($subItem in $prop.Value) {
-                                [void]$Global:SpendUsers_Delegate.Add([PSCustomObject]@{
-                                    nim_id = Get-ObjectHash -Object $subItem
-                                    spendUser_id = $item.id
-                                    type = $prop.Name
-                                    canApprove = $subItem.canApprove
-                                    canPrepare = $subItem.canPrepare
-                                    canPrepareForApproval = $subItem.canPrepareForApproval
-                                    canReceiveApprovalEmail = $subItem.canReceiveApprovalEmail
-                                    canReceiveEmail = $subItem.canReceiveEmail
-                                    canSubmit = $subItem.canSubmit
-                                    canSubmitTravelRequest = $subItem.canSubmitTravelRequest
-                                    canUseBi = $subItem.canUseBi
-                                    canViewReceipt = $subItem.canViewReceipt
-                                    delegate_value = $subItem.delegate.value
-                                })
-                            }
-                        }
-
-                        # Roles
-                        if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles.length -gt 0) {
-                            foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles) {
-                                [void]$Global:SpendUsers_Roles.Add([PSCustomObject]@{
-                                    nim_id = Get-ObjectHash -Object $subItem
-                                    spendUser_id = $item.id
-                                    roleName = $subItem.roleName
-                                    roleGroups = $subItem.roleGroups
-                                })
-                            }
-                        }
-                        
                     }
-                    
-                    [void]$Global:SpendUsers.AddRange(@() + ($output.result | Select-Object $function_params.properties))
+
+                    # Approver
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+
+                    # Approver Limit
+                    foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:ApproverLimit'.PSObject.Properties) {
+                        foreach($subItem in $prop.Value) {
+                            [void]$Global:SpendUsers_ApproverLimit.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                type = $prop.Name
+                                approvalGroup = $subItem.approvalGroup
+                                approvalLimit = $subItem.approvalLimit
+                                approvalType = $subItem.approvalType
+                                exceptionApprovalAuthority = $subItem.exceptionApprovalAuthority
+                                reimbursementCurrency = $subItem.reimbursementCurrency
+                            })
+                        }
+                    }
+
+                    # Delegate
+                    foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Delegate'.PSObject.Properties) {
+                        foreach($subItem in $prop.Value) {
+                            [void]$Global:SpendUsers_Delegate.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                type = $prop.Name
+                                canApprove = $subItem.canApprove
+                                canPrepare = $subItem.canPrepare
+                                canPrepareForApproval = $subItem.canPrepareForApproval
+                                canReceiveApprovalEmail = $subItem.canReceiveApprovalEmail
+                                canReceiveEmail = $subItem.canReceiveEmail
+                                canSubmit = $subItem.canSubmit
+                                canSubmitTravelRequest = $subItem.canSubmitTravelRequest
+                                canUseBi = $subItem.canUseBi
+                                canViewReceipt = $subItem.canViewReceipt
+                                delegate_value = $subItem.delegate.value
+                            })
+                        }
+                    }
+
+                    # Roles
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles) {
+                            [void]$Global:SpendUsers_Roles.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                roleName = $subItem.roleName
+                                roleGroups = $subItem.roleGroups
+                            })
+                        }
+                    }
+
+                    [void]$Global:SpendUsers.Add(($output.result | Select-Object $function_params.properties))
 
                     $r.Pipe.Dispose()
-                    $runspaces.Remove($r)
+                    $runspaces.RemoveAt($i)
                 }
+                if ($runspaces.Count -gt 0) { Start-Sleep -Milliseconds 2500 }
             }
 
             $runspacePool.Close()
             $runspacePool.Dispose()
+            $cancellationSource.Dispose()
         }
 
         $Global:SpendUsers
@@ -2283,8 +2311,6 @@ function Idm-travel_usersRead {
 
             # Prepare runspace pool
             $cancellationSource = [System.Threading.CancellationTokenSource]::new()
-            $cancellationToken = $cancellationSource.Token
-            $system_params.CancellationSource = $cancellationSource
 
             $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
             $runspacePool.Open()
@@ -2298,18 +2324,20 @@ function Idm-travel_usersRead {
             $funcDef3 = "function Initialize-Proxy { $((Get-Command Initialize-Proxy -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef4 = "function Resolve-NestedValue { $((Get-Command Resolve-NestedValue -CommandType Function).ScriptBlock.ToString()) }"
 
+            # Capture once — stable for the entire sync
+            $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
+            $authTokenSnapshot       = $Global:AuthToken
+            $proxyInitializedSnapshot = $Global:ProxyInitialized
+
             foreach ($item in $Global:IdentityUsers) {
                 $runspace = [powershell]::Create()
 
-                # Capture values before entering the runspace
-                $proxySnapshot    = $Global:Proxy
-                $authTokenSnapshot = $Global:AuthToken
-
                 [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript($funcDef3).AddScript($funcDef4).AddScript({
-                    param($item, $system_params, $Class, $template, $index, $properties, $propertiesHT, $proxy, $authToken)
-                    
-                    $Global:Proxy = $proxy
-                    $Global:AuthToken = $authToken
+                    param($item, $system_params, $Class, $template, $index, $properties, $propertiesHT, $proxy, $authToken, $proxyInitialized)
+
+                    $Global:Proxy            = $proxy
+                    $Global:AuthToken        = $authToken
+                    $Global:ProxyInitialized = $proxyInitialized
 
                     $itemResult = @{
                         result = $null
@@ -2323,15 +2351,16 @@ function Idm-travel_usersRead {
                         Uri = "profile/travel/v4/Users/$($item.id)"
                         LoggingEnabled = $false
                     }
-                    
+
                     try {
                         $response = Execute-Request @splat
                     } catch {
                         $itemResult.logMessage = "Retrieve User Info [$($item.id)] - $_"
                         return $itemResult
                     }
+                    $response = $response[0]
 
-                    $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                    $row = [PSCustomObject]([ordered]@{} + $template)
 
                     $itemResult.rawResult = $response
 
@@ -2348,11 +2377,11 @@ function Idm-travel_usersRead {
                         $colName = if ($schemaProp.alias) { $schemaProp.alias } else { $prop.Name }
                         $row.($colName) = $prop.Value
                     }
-                    
+
                     $itemResult.result = $row
 
                     return $itemResult
-                }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($template).AddArgument($index).AddArgument($properties.Name).AddArgument($propertiesHT).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot)
+                }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($template).AddArgument($index).AddArgument($properties.Name).AddArgument($propertiesHT).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot).AddArgument($proxyInitializedSnapshot)
 
                 $runspace.RunspacePool = $runspacePool
                 $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
@@ -2364,8 +2393,10 @@ function Idm-travel_usersRead {
             $completed = 0
 
             while ($runspaces.Count -gt 0) {
-                $done = $runspaces | Where-Object { $_.Status.IsCompleted }
-                foreach ($r in $done) {
+                for ($i = $runspaces.Count - 1; $i -ge 0; $i--) {
+                    $r = $runspaces[$i]
+                    if (-not $r.Status.IsCompleted) { continue }
+
                     $output = $r.Pipe.EndInvoke($r.Status)
                     $completed++
 
@@ -2377,26 +2408,27 @@ function Idm-travel_usersRead {
                     if($null -ne $output.logMessage) {
                         Log verbose $output.logMessage
                     }
-                    
-                    
+
                     # Custom Fields
                     foreach($subItem in $output.rawResult.'urn:ietf:params:scim:schemas:extension:travel:2.0:User'.customFields) {
                         [void]$Global:TravelUsers_CustomFields.Add([PSCustomObject]@{
-                            travelUser_id = $item.id
+                            travelUser_id = $output.rawResult.id
                             name = $subItem.name
                             value = $subItem.Value
                         })
                     }
 
-                    [void]$Global:TravelUsers.AddRange(@() + ($output.result | Select-Object $function_params.properties))
-                    
+                    [void]$Global:TravelUsers.Add(($output.result | Select-Object $function_params.properties))
+
                     $r.Pipe.Dispose()
-                    $runspaces.Remove($r)
+                    $runspaces.RemoveAt($i)
                 }
+                if ($runspaces.Count -gt 0) { Start-Sleep -Milliseconds 2500 }
             }
 
             $runspacePool.Close()
             $runspacePool.Dispose()
+            $cancellationSource.Dispose()
         }
 
         $Global:TravelUsers
@@ -2771,7 +2803,7 @@ function Execute-Authorization {
         if($SystemParams.use_proxy) {
             $splat["Proxy"] = $Global:Proxy['ProxyAddress']
             if($SystemParams.use_proxy_credentials) {
-                $splat["proxyCredential"] - $Global:Proxy["ProxyCredential"]
+                $splat["proxyCredential"] = $Global:Proxy["ProxyCredential"]
             }
         }
 
@@ -2782,13 +2814,16 @@ function Execute-Request {
     param (
         [hashtable] $SystemParams,
         [string] $Method,
-        [string] $Body,
+        [object] $Body,
         [string] $Uri,
         [string] $Path = $null,
         [boolean] $LoggingEnabled = $true
     )
 
-    Initialize-Proxy -SystemParams $SystemParams
+    if (-not $Global:ProxyInitialized) {
+        Initialize-Proxy -SystemParams $SystemParams
+        $Global:ProxyInitialized = $true
+    }
 
     if ($Global:AuthToken.length -lt 1) {
         Execute-Authorization $SystemParams
@@ -2824,7 +2859,7 @@ function Execute-Request {
 
             $queryString = (
                 $Body.GetEnumerator() |
-                ForEach-Object { "$($_.Key)=$($_.Value)" }
+                ForEach-Object { "$($_.Key)=$([Uri]::EscapeDataString($_.Value))" }
             ) -join "&"
 
             if ($queryString.Length -gt 0) {
@@ -2844,13 +2879,14 @@ function Execute-Request {
     }
 
     # Cursor pagination accumulator
-    $allData = @()
+    $allData = [System.Collections.Generic.List[object]]::new()
+    $baseUri = $splat.Uri
     $cursor = $null
 
     do {
         # Add cursor to query string if present
         if ($cursor) {
-            $splat.Uri = ("https://{0}/{1}?cursor={2}" -f $SystemParams.geolocation, $Uri, $cursor)
+            $splat.Uri = if ($baseUri -match '\?') { "$($baseUri)&cursor=$cursor" } else { "$($baseUri)?cursor=$cursor" }
         }
 
         $attempt = 0
@@ -2906,12 +2942,11 @@ function Execute-Request {
         } while ($true)
 
         # Append data
-        if($Path.length -lt 1) {
-            $allData += $response
-
+        if ($Path.length -lt 1) {
+            $allData.Add($response)
         } else {
             if ($response.$Path) {
-                $allData += $response.$Path
+                $allData.AddRange([object[]]@($response.$Path))
             }
         }
 
@@ -3013,12 +3048,16 @@ function Get-ObjectHash {
     )
 
     # Convert object → JSON → UTF8 bytes
-    $json  = $Object | ConvertTo-Json -Depth 100
+    $json  = $Object | ConvertTo-Json -Depth 10
     $bytes = [Text.Encoding]::UTF8.GetBytes($json)
 
     # Compute hash
     $hasher = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
-    $hashBytes = $hasher.ComputeHash($bytes)
+    try {
+        $hashBytes = $hasher.ComputeHash($bytes)
+    } finally {
+        $hasher.Dispose()
+    }
 
     # Output format
     switch ($Encoding) {
