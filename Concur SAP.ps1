@@ -176,7 +176,7 @@ $Properties = @{
     )
     TravelUser = @(
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'urn:ietf:params:scim:schemas:extension:travel:2.0:User';            type = 'object';   objectfields = @("ruleClass.name","ruleClass.id","travelCrsName","name.namePrefix","name.givenName","name.hasNoMiddleName","name.middleName","name.familyName","name.honorificSuffix","travelNameRemark","gender","orgUnit","manager.value","manager.employeeNumber","groups","eReceiptOptIn" );             options = @('default','update_o'); alias = 'TravelUser' }
+        @{ name = 'urn:ietf:params:scim:schemas:extension:travel:2.0:User';            type = 'object';   objectfields = @("ruleClass.name","ruleClass.id","travelCrsName","name.namePrefix","name.givenName","name.hasNoMiddleName","name.middleName","name.familyName","name.honorificSuffix","travelNameRemark","gender","orgUnit","manager.value","manager.employeeNumber","groups","eReceiptOptIn" );             options = @('default','create_o','update_o'); alias = 'TravelUser' }
     )
     TravelUser_CustomField = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
@@ -1785,180 +1785,6 @@ function Idm-spend_userCreate {
     Log verbose "Done"
 }
 
-<#
-function Idm-spend_userCreate {
-    param (
-        # Operations
-        [switch] $GetMeta,
-        # Parameters
-        [string] $SystemParams,
-        [string] $FunctionParams
-    )
-
-    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
-    $Class = 'SpendUser'
-
-    if ($GetMeta) {
-        #
-        # Get meta data
-        #
-        @{
-            semantics = 'create'
-            parameters = @(
-                $Global:Properties.$Class |
-                    Where-Object { $_.options -contains 'key' -or $_.options -contains 'create_m' } |
-                    ForEach-Object {
-                        @{ name = $_.name; allowance = 'mandatory' }
-                    }
-
-                $Global:Properties.$Class |
-                    Where-Object { $_.options -contains 'create_o' -or $_.options -contains 'optional' } |
-                    ForEach-Object {
-                        if ($_.Type -eq 'object') {
-                            foreach ($field in $_.objectfields) {
-                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
-                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
-                            }
-                        } else {
-                            @{ name = $_.name; allowance = 'optional' }
-                        }
-                    }
-
-                $Global:Properties.$Class |
-                    Where-Object { -not ( $_.options -contains 'create_m' -or $_.options -contains 'create_o' -or $_.options -contains 'optional' -or $_.options.Contains('key') ) } |
-                    ForEach-Object {
-                        if ($_.Type -eq 'object') {
-                            foreach ($field in $_.objectfields) {
-                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
-                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
-                            }
-                        } else {
-                            @{ name = $_.name; allowance = 'prohibited' }
-                        }
-                    }
-            )
-        }
-    }
-    else {
-        #
-        # Execute function
-        #
-        $system_params   = ConvertFrom-Json2 $SystemParams
-        $function_params = ConvertFrom-Json2 $FunctionParams
-
-        $uri = "profile/v4/Bulk"
-        
-        $body = [PSObject]@{
-            "schemas"= @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
-            "failOnErrors"= 1
-            "Operations" = [System.Collections.ArrayList]@()
-        }
-        
-        $lookup = @{}
-        $Properties.SpendUser | Where-Object { $null -ne $_.alias} | ForEach-Object { $lookup[$_.alias] = $_.name }
-
-        $operationObj = [PSObject]@{
-                "method" = "POST"
-                "path" = "/Users"
-                "bulkId" = "{0}-001" -f $function_params.id
-                "data" = [PSObject]@{}
-            }
-
-        foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
-            if($prop.Name -eq 'id') { continue }
-
-            $prefix = $prop.Name.split('_')[0]
-            $lookupValue = $lookup[$prefix]
-
-            if($lookupValue.length -gt 0) {
-                $fieldname = ($prop.Name.Replace("$($prefix)_",''))
-                if(!(([PSCustomObject]$operationObj.data).PSObject.Properties.Name -contains $lookupValue) ) {
-                    $operationObj.data.$lookupValue = [PSObject]@{}
-                }
-                
-                if($fieldname.contains('_')) {
-                    $field = $fieldname.split('_')
-                    $objname = $field[0]
-                    $fieldname = $field[1]
-                    $operationObj.data.$lookupValue.$objname = @{ $fieldname = $prop.Value }
-                } else {
-                    $operationObj.data.$lookupValue.$fieldname = $prop.Value
-                }
-            } elseif($prop.Name.Contains("_")) {
-                $field = ($prop.Name).split('_')
-                $objname = $field[0]
-                $fieldname = $field[1]
-
-                if(([PSCustomObject]$operationObj.data).PSObject.Properties.Name -contains $objName ) {
-                    $operationObj.data.$objname.$fieldname = $prop.Value 
-                } else {
-                    $operationObj.data.$objname = [PSObject]@{ $fieldname = $prop.Value }
-                }
-            } else {
-                $operationObj.data.($prop.Name) = $prop.Value
-            }
-            
-            $operationObj.data.active = $true
-            
-        }
-
-        $body.Operations.Add($operationObj)
-
-        $splat = @{
-            SystemParams = $system_params
-            Method = "POST"
-            Uri = $uri                    
-            Body = ($body | ConvertTo-Json -Depth 10)
-        }
-        
-        $response = Execute-Request @splat
-        $provisionStatus = $response[0]
-
-        # Poll bulk provisioning status until complete or max wait
-        if ($null -ne $provisionStatus.meta.location) {
-            $provisionUri = ([Uri]$provisionStatus.meta.location).PathAndQuery.TrimStart('/')
-            $maxAttempts  = 30
-            $pollInterval = [int]$system_params.retryDelay
-
-            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-                if ($attempt -gt 1) { Start-Sleep -Seconds $pollInterval }
-
-                $statusSplat = @{
-                    SystemParams = $system_params
-                    Method       = "GET"
-                    Uri          = $provisionUri
-                    Body         = @{ attributes = "operations" }
-                }
-                $provisionStatus = (Execute-Request @statusSplat)[0]
-
-                if ($provisionStatus.status.completed -eq $true) { break }
-            }
-
-            if (-not $provisionStatus.status.completed) {
-                Log warning "Bulk provision did not complete after $maxAttempts attempts ($($maxAttempts * $pollInterval)s max wait)"
-            }
-        }
-
-        if($provisionStatus.operationsCount.failed -gt 0) {
-            foreach($item in $provisionStatus.operations.extensions) {
-                if($item.status.success -eq $false -and $item.status.success -ne $null) {
-                    foreach($message in $item.messages) {
-                        log error "$($message | ConvertTo-Json)"
-                    }
-                }
-            }
-            throw "Failed to create spend user"
-        }
-    
-        LogIO info "SpendUserUpdate" -out $provisionStatus
-        $function_params
-        
-    }
-
-    Log verbose "Done"
-}
-#>
-
 function Idm-spend_userUpdate {
     param (
         # Operations
@@ -2723,6 +2549,111 @@ function Idm-travel_usersRead {
         $Global:TravelUsers
 }
 
+function Idm-travel_userCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'TravelUser'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'key' -or $_.options -contains 'create_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'create_m' -or $_.options -contains 'create_o' -or $_.options -contains 'optional' -or $_.options.Contains('key') ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.id
+        
+        $body = [PSObject]@{
+            'Operations' = [System.Collections.ArrayList]@()
+        }
+        
+        $lookup = @{}
+        $Properties.TravelUser | Where-Object { $null -ne $_.alias} | ForEach-Object { $lookup[$_.alias] = $_.name }
+
+        foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
+            if($prop.Name -eq 'id') { continue }
+
+            $prefix = $prop.Name.split('_')[0]
+            $lookupValue = $lookup[$prefix]
+
+            if($lookupValue.length -gt 0) {
+                $fieldname = '{0}:{1}' -f $lookupValue, $prop.Name.replace("$($prefix)_",'')
+            } else {
+                $fieldname = $prop.Name
+            }
+            
+            [void]$body.Operations.Add([PSObject]@{
+                'op' ='replace'
+                'path' = $fieldname
+                'value' = $prop.Value
+            })
+        }
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json)
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "TravelUserCreate" -out $response
+        $function_params
+        
+    }
+
+    Log verbose "Done"
+}
+
 function Idm-travel_userUpdate {
     param (
         # Operations
@@ -3355,4 +3286,46 @@ function Get-ObjectHash {
         "Base64" { return [Convert]::ToBase64String($hashBytes) }
         "Hex"    { return -join ($hashBytes | ForEach-Object { $_.ToString("x2") }) }
     }
+}
+
+function Get-ProvisioningStatus {
+    param (
+    [hashtable] $SystemParams,    
+    [object] $ProvisionStatus
+    )
+        # Poll bulk provisioning status until complete or max wait
+        if ($null -ne $ProvisionStatus.meta.location) {
+            $provisionUri = ([Uri]$ProvisionStatus.meta.location).PathAndQuery.TrimStart('/')
+            $maxAttempts  = 30
+            $pollInterval = [int]$SystemParams.retryDelay
+
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+                if ($attempt -gt 1) { Start-Sleep -Seconds $pollInterval }
+
+                $statusSplat = @{
+                    SystemParams = $SystemParams
+                    Method       = "GET"
+                    Uri          = $provisionUri
+                    Body         = @{ attributes = "operations" }
+                }
+                $ProvisionStatus = (Execute-Request @statusSplat)[0]
+
+                if ($ProvisionStatus.status.completed -eq $true) { break }
+            }
+
+            if (-not $ProvisionStatus.status.completed) {
+                Log warning "Bulk provision did not complete after $maxAttempts attempts ($($maxAttempts * $pollInterval)s max wait)"
+            }
+        }
+
+        if($ProvisionStatus.operationsCount.failed -gt 0) {
+            foreach($item in $ProvisionStatus.operations.extensions) {
+                if($item.status.success -eq $false -and $item.status.success -ne $null) {
+                    foreach($message in $item.messages) {
+                        log error "$($message | ConvertTo-Json)"
+                    }
+                }
+            }
+            throw "Failed request"
+        }
 }
