@@ -59,7 +59,7 @@ $Properties = @{
         @{ name = 'preferredLanguage';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
         @{ name = 'timezone';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
         @{ name = 'title';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
-        @{ name = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';            type = 'object';   objectfields = @("terminationDate","companyId","department","organization","manager.value","manager.employeeNumber","costCenter","startDate","leavesOfAbsence","employeeNumber");             options = @('default','create_o','update_o'); alias = 'EnterpriseUser' }
+        @{ name = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';            type = 'object';   objectfields = @("terminationDate","companyId","department","organization","manager.value","manager.employeeNumber","costCenter","startDate","leavesOfAbsence","employeeNumber","division");             options = @('default','create_o','update_o'); alias = 'EnterpriseUser' }
         @{ name = 'userName';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_o') }
     )
     IdentityUser_Address = @(
