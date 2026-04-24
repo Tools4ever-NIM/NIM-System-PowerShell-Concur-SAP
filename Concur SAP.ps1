@@ -346,11 +346,8 @@ function Idm-SystemInfo {
     }
 
     if ($TestConnection) {
-        Log info "$($ConnectionParams)"
-        Log info "$($Connection)"
-        $system_params   = ConvertFrom-Json2 $ConnectionParams
-        Execute-Request -SystemParams $system_params -Method "GET" -Uri "profile/identity/v4.1/Users?count=1"
-
+        $system_params = ConvertFrom-Json2 $ConnectionParams
+        Execute-Request -SystemParams $system_params -Method "GET" -Uri "profile/identity/v4.1/Users?count=1" -BypassPagination $true | Out-Null
     }
 
     if ($Configuration) {
@@ -3001,7 +2998,8 @@ function Execute-Request {
         [object] $Body,
         [string] $Uri,
         [string] $Path = $null,
-        [boolean] $LoggingEnabled = $true
+        [boolean] $LoggingEnabled = $true,
+        [boolean] $BypassPagination = $false
     )
 
     if (-not $Global:ProxyInitialized) {
@@ -3135,6 +3133,7 @@ function Execute-Request {
         }
 
         # Get next cursor
+        if($BypassPagination) { break }
         $cursor = $response.nextCursor
 
     } while ($cursor)
