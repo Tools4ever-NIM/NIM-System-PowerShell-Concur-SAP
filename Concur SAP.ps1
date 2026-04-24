@@ -60,7 +60,7 @@ $Properties = @{
         @{ name = 'timezone';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
         @{ name = 'title';            type = 'string';   objectfields = $null;             options = @('default','create_o','update_o') }
         @{ name = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';            type = 'object';   objectfields = @("terminationDate","companyId","department","organization","manager.value","manager.employeeNumber","costCenter","startDate","leavesOfAbsence","employeeNumber");             options = @('default','create_o','update_o'); alias = 'EnterpriseUser' }
-        @{ name = 'username';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_o') }
+        @{ name = 'userName';            type = 'string';   objectfields = $null;             options = @('default','create_m','update_o') }
     )
     IdentityUser_Address = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
@@ -120,7 +120,6 @@ $Properties = @{
         @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
         @{ name = 'schemas';            type = 'string';   objectfields = $null;             options = @('default') }
         @{ name = 'meta';            type = 'object';   objectfields = @("resourceType","created","lastModified","version","location");             options = @('default') }
-        @{ name = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';            type = 'object';   objectfields = @("companyId");             options = @('create_o'); alias = 'EnterpriseUser' }
         @{ name = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User';            type = 'object';   objectfields = @("reimbursementCurrency","reimbursementType","ledgerCode","country","budgetCountryCode","stateProvince","locale","cashAdvanceAccountCode","testEmployee","nonEmployee","biManager.value");             options = @('default','create_o','update_o'); alias = 'SpendUser' }
         @{ name = 'urn:ietf:params:scim:schemas:extension:spend:2.0:UserPreference';            type = 'object';   objectfields = @("showImagingIntro","expenseAuditRequired","allowCreditCardTransArrivalEmails","allowReceiptImageAvailEmails","promptForCardTransactionsOnReport","autoAddTripCardTransOnReport","promptForReportPrintFormat","defaultReportPrintFormat","showTotalOnReport","showExpenseOnReport","showInstructHelpPanel","useQuickItinAsDefault","enableOcrForUi","enableOcrForEmail","enableTripBasedAssistant");             options = @('default','update_o'); alias = 'SpendUserPreference' }
         @{ name = 'urn:ietf:params:scim:schemas:extension:spend:2.0:InvoicePreference';            type = 'string';   objectfields = $null;             options = @('default','update_o'); alias = 'SpendInvoicePreference' }
@@ -1741,6 +1740,112 @@ function Idm-spend_userCreate {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
+        $uri = "profile/v4/Users/{0}" -f $function_params.id
+        
+        $body = [PSObject]@{
+            'Operations' = [System.Collections.ArrayList]@()
+        }
+        
+        $lookup = @{}
+        $Properties.SpendUser | Where-Object { $null -ne $_.alias} | ForEach-Object { $lookup[$_.alias] = $_.name }
+
+        foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
+            if($prop.Name -eq 'id') { continue }
+
+            $prefix = $prop.Name.split('_')[0]
+            $lookupValue = $lookup[$prefix]
+
+            if($lookupValue.length -gt 0) {
+                $fieldname = '{0}:{1}' -f $lookupValue, $prop.Name.replace("$($prefix)_",'')
+            } else {
+                $fieldname = $prop.Name
+            }
+            
+            [void]$body.Operations.Add([PSObject]@{
+                'op' ='replace'
+                'path' = $fieldname
+                'value' = $prop.Value
+            })
+        }
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json)
+        }
+        
+        $response = Execute-Request @splat
+    
+        LogIO info "SpendUserCreate" -out $response
+        $function_params
+        
+    }
+
+    Log verbose "Done"
+}
+
+<#
+function Idm-spend_userCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'key' -or $_.options -contains 'create_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'create_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'create_m' -or $_.options -contains 'create_o' -or $_.options -contains 'optional' -or $_.options.Contains('key') ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
         $uri = "profile/v4/Bulk"
         
         $body = [PSObject]@{
@@ -1793,6 +1898,7 @@ function Idm-spend_userCreate {
                 $operationObj.data.($prop.Name) = $prop.Value
             }
             
+            $operationObj.data.active = $true
             
         }
 
@@ -1837,10 +1943,11 @@ function Idm-spend_userCreate {
             foreach($item in $provisionStatus.operations.extensions) {
                 if($item.status.success -eq $false -and $item.status.success -ne $null) {
                     foreach($message in $item.messages) {
-                        log error ("{0} - {1} - {2}" -f $message.type, $message.code, $message.message)
+                        log error "$($message | ConvertTo-Json)"
                     }
                 }
             }
+            throw "Failed to create spend user"
         }
     
         LogIO info "SpendUserUpdate" -out $provisionStatus
@@ -1850,6 +1957,7 @@ function Idm-spend_userCreate {
 
     Log verbose "Done"
 }
+#>
 
 function Idm-spend_userUpdate {
     param (
