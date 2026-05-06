@@ -1207,6 +1207,7 @@ function Idm-identity_users_phoneNumberAdd {
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
         LogIO info "identityUserPhoneNumberAdd" -out $function_params
+        $function_params
     }
     
     Log verbose "Done"
@@ -2002,6 +2003,7 @@ function Idm-spend_users_customDataCreate {
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
         LogIO info "spendUserCustomDataCreate" -out $function_params
+        $function_params
     }
     
     Log verbose "Done"
@@ -2287,6 +2289,7 @@ function Idm-spend_users_roleAdd {
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
         LogIO info "spendUserRoleAdd" -out $function_params
+        $function_params
     }
     
     Log verbose "Done"
@@ -2870,7 +2873,8 @@ function Idm-travel_users_customFieldCreate {
         $response = Execute-Request @splat
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
-        LogIO info "spendUserCustomDataCreate" -out $function_params
+        LogIO info "travelUserCustomDataCreate" -out $function_params
+        $function_params
     }
     
     Log verbose "Done"
