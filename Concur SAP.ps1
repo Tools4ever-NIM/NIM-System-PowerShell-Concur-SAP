@@ -972,6 +972,7 @@ function Idm-identity_users_emailAdd {
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
         LogIO info "identityUserEmailAdd" -out $function_params
+        $function_params
     }
     
     Log verbose "Done"
