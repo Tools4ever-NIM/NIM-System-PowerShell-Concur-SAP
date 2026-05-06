@@ -1985,9 +1985,17 @@ function Idm-spend_users_customDataCreate {
             "Operations"= [System.Collections.ArrayList]@()
         }
         $newObj = [PSObject]@{
-            'op' = 'replace'
-            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:customData[id eq "{0}"].value' -f $function_params.id
-            'value' = $function_params.value
+            'op' = 'add'
+            'value' = [PSObject]@{
+                "urn:ietf:params:scim:schemas:extension:spend:2.0:User" = [PSObject]@{
+                    "customData" = @(
+                        [PSObject]@{
+                            id = $function_params.id
+                            value = $function_params.value
+                        }
+                    )
+                }   
+            }
         }
         
         [void]$body.Operations.Add($newObj)
@@ -2076,9 +2084,17 @@ function Idm-spend_users_customDataUpdate {
             "Operations"= [System.Collections.ArrayList]@()
         }
         $newObj = [PSObject]@{
-            'op' = 'replace'
-            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:customData[id eq "{0}"].value' -f $function_params.id
-            'value' = $function_params.value
+            'op' = 'add'
+            'value' = [PSObject]@{
+                "urn:ietf:params:scim:schemas:extension:spend:2.0:User" = [PSObject]@{
+                    "customData" = @(
+                        [PSObject]@{
+                            id = $function_params.id
+                            value = $function_params.value
+                        }
+                    )
+                }   
+            }
         }
         
         [void]$body.Operations.Add($newObj)
@@ -2284,9 +2300,8 @@ function Idm-spend_users_roleAdd {
             Uri = $uri                    
             Body = ($body | ConvertTo-Json -Depth 10)
         }
-        
+
         $response = Execute-Request @splat
-    
         $function_params.nim_id = Get-ObjectHash -Object $function_params
         LogIO info "spendUserRoleAdd" -out $function_params
         $function_params
@@ -3161,7 +3176,7 @@ function Execute-Request {
                     }
 
                     default {
-                        throw
+                        throw $_
                     }
                 }
             }
