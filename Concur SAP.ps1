@@ -1859,6 +1859,17 @@ function Idm-spend_userUpdate {
         foreach($prop in ([PSCustomObject]$function_params).PSObject.properties) {
             if($prop.Name -eq 'id') { continue }
 
+            if($prop.Name -eq 'SpendUser_biManager_value') { 
+                [void]$body.Operations.Add([PSObject]@{
+                    'op' ='replace'
+                    'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:User:biManager'
+                    'value' = [PSObject]@{
+                        "employeeNumber" = $prop.Value
+                    }
+                })
+                continue
+            }
+
             $prefix = $prop.Name.split('_')[0]
             $lookupValue = $lookup[$prefix]
 
@@ -1867,7 +1878,7 @@ function Idm-spend_userUpdate {
             } else {
                 $fieldname = $prop.Name
             }
-            
+        
             [void]$body.Operations.Add([PSObject]@{
                 'op' ='replace'
                 'path' = $fieldname
@@ -1879,7 +1890,7 @@ function Idm-spend_userUpdate {
             SystemParams = $system_params
             Method = "PATCH"
             Uri = $uri                    
-            Body = ($body | ConvertTo-Json)
+            Body = ($body | ConvertTo-Json -Depth 10)
         }
         
         $response = Execute-Request @splat
