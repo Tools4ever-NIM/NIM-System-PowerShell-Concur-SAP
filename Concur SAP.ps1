@@ -136,10 +136,11 @@ $Properties = @{
     )
     SpendUser_Approver = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }    
-        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default','key') }
-        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'approver_value';            type = 'string';   objectfields = $null;             options = @('default') }
-        @{ name = 'primary';            type = 'boolean';   objectfields = $null;             options = @('default') }
+        @{ name = 'id';            type = 'string';   objectfields = $null;             options = @('default') }
+        @{ name = 'spendUser_id';            type = 'string';   objectfields = $null;             options = @('default','add_m','remove_m') }
+        @{ name = 'approver_value';            type = 'string';   objectfields = $null;             options = @('default','add_m','remove_m') }
+        @{ name = 'approval_type';            type = 'string';   objectfields = $null;             options = @('default','add_m','remove_m') }
+        @{ name = 'primary';            type = 'boolean';   objectfields = $null;             options = @('default','add_m') }
     )
     SpendUser_ApproverLimit = @(
         @{ name = 'nim_id';            type = 'string';   objectfields = $null;             options = @('default','key') }
@@ -1605,13 +1606,86 @@ function Idm-spend_usersRead {
                         }
                     }
 
-                    # Approver
+                    # Approvers
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
                                 nim_id = Get-ObjectHash -Object $subItem
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
+                                approval_type = 'report'
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.cashAdvance.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.cashAdvance) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                approval_type = 'cashAdvance'
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.request.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.request) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                approval_type = 'request'
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+                    
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.invoice.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.invoice) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                approval_type = 'invoice'
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.purchaseRequest.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.purchaseRequest) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                approval_type = 'purchaseRequest'
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.statement.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.statement) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                approval_type = 'statement'
+                                primary = $subItem.primary
+                            })
+                        }
+                    }
+
+                    if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.budget.length -gt 0) {
+                        foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.budget) {
+                            [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
+                                nim_id = Get-ObjectHash -Object $subItem
+                                spendUser_id = $item.id
+                                approver_value = $subItem.approver.value
+                                approval_type = 'budget'
                                 primary = $subItem.primary
                             })
                         }
@@ -2125,7 +2199,7 @@ function Idm-spend_users_customDataUpdate {
     Log verbose "Done"
 }
 
-function Idm-spend_users_approverRead {
+function Idm-spend_users_approversRead {
     param (
         # Mode
         [switch] $GetMeta,    
@@ -2149,6 +2223,207 @@ function Idm-spend_users_approverRead {
         }
 
         $Global:SpendUsers_Approver
+}
+
+function Idm-spend_users_approverAdd {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser_Approver'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'add_m' } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'add_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'add_m' -or $_.options -contains 'add_o' -or $_.options -contains 'optional' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+
+
+        # Get User
+        $uri = 
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "GET"
+            Uri = "profile/v4/Users/{0}" -f $function_params.approver_value            
+        }
+
+        $approverResponse = Execute-Request @splat
+
+        
+        # Update user
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+        $newObj = [PSObject]@{
+            'op' = 'add'
+            'path' = ('urn:ietf:params:scim:schemas:extension:spend:2.0:Approver:{0}' -f $function_params.approval_type)
+            'value' = @(
+                [PSObject]@{
+                    'approver' = [PSObject]@{
+                        "employeeNumber" = $approverResponse.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'.employeeNumber
+                    }
+                    "primary" = $function_params.primary
+                }
+            )
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+
+        $response = Execute-Request @splat
+        $function_params.nim_id = Get-ObjectHash -Object $function_params
+        LogIO info "spendUserApproverAdd" -out $function_params
+        $function_params
+    }
+    
+    Log verbose "Done"
+}
+
+function Idm-spend_users_approverRemove {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SpendUser_Approver'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'remove_m' -or $_.options -contains 'key'  } |
+                    ForEach-Object {
+                        @{ name = $_.name; allowance = 'mandatory' }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { $_.options -contains 'remove_o' -or $_.options -contains 'optional' } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field.replace('.','_'))"; allowance = 'optional' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'optional' }
+                        }
+                    }
+
+                $Global:Properties.$Class |
+                    Where-Object { -not ( $_.options -contains 'remove_m' -or $_.options -contains 'remove_o' -or $_.options -contains 'optional' -or $_.options -contains 'key' ) } |
+                    ForEach-Object {
+                        if ($_.Type -eq 'object') {
+                            foreach ($field in $_.objectfields) {
+                                $colPrefix = if ($_.alias) { $_.alias } else { $_.name }
+                                @{ name = "$($colPrefix)_$($field)"; allowance = 'prohibited' }
+                            }
+                        } else {
+                            @{ name = $_.name; allowance = 'prohibited' }
+                        }
+                    }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "profile/v4/Users/{0}" -f $function_params.spendUser_id          
+        
+        $body = [PSObject]@{
+            "schemas" = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            "Operations"= [System.Collections.ArrayList]@()
+        }
+
+        $newObj = [PSObject]@{
+            'op' = 'remove'
+            'path' = 'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver:{0}[approver.value eq "{1}"]' -f $function_params.approval_type, $function_params.approver_value
+        }
+        
+        [void]$body.Operations.Add($newObj)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PATCH"
+            Uri = $uri                    
+            Body = ($body | ConvertTo-Json -Depth 10)
+        }
+        
+        $response = Execute-Request @splat
+
+        LogIO info "spendUserRoleRemove"
+    }
+    
+    Log verbose "Done"
 }
 
 function Idm-spend_users_approverLimitRead {
