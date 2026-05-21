@@ -322,6 +322,13 @@ function Idm-SystemInfo {
                 value = 2
             }
             @{
+                name = 'request_timeout_seconds'
+                type = 'textbox'
+                label = 'Request timeout (seconds)'
+                description = ''
+                value = 100
+            }
+            @{
                 name = 'nr_of_threads'
                 type = 'textbox'
                 label = 'Max. number of simultaneous requests'
@@ -650,7 +657,7 @@ function Idm-identity_userCreate {
             SystemParams = $system_params
             Method = "POST"
             Uri = $uri                    
-            Body = ($body | ConvertTo-Json)
+            Body = ($body | ConvertTo-Json -Depth 10)
         }
         
         $response = Execute-Request @splat
@@ -753,7 +760,7 @@ function Idm-identity_userUpdate {
             SystemParams = $system_params
             Method = "PATCH"
             Uri = $uri                    
-            Body = ($body | ConvertTo-Json)
+            Body = ($body | ConvertTo-Json -Depth 10)
         }
         
         $response = Execute-Request @splat
@@ -1848,7 +1855,7 @@ function Idm-spend_userCreate {
             SystemParams = $system_params
             Method = "PATCH"
             Uri = $uri                    
-            Body = ($body | ConvertTo-Json)
+            Body = ($body | ConvertTo-Json -Depth 10)
         }
         
         $response = Execute-Request @splat
@@ -2946,7 +2953,7 @@ function Idm-travel_userCreate {
             SystemParams = $system_params
             Method = "PATCH"
             Uri = $uri                    
-            Body = ($body | ConvertTo-Json)
+            Body = ($body | ConvertTo-Json -Depth 10)
         }
         
         $response = Execute-Request @splat
@@ -3051,7 +3058,7 @@ function Idm-travel_userUpdate {
             SystemParams = $system_params
             Method = "PATCH"
             Uri = $uri                    
-            Body = ($body | ConvertTo-Json)
+            Body = ($body | ConvertTo-Json -Depth 10)
         }
         
         $response = Execute-Request @splat
@@ -3324,6 +3331,7 @@ function Execute-Authorization {
             Method = 'POST'
             Uri = ("https://{0}/{1}" -f $SystemParams.geolocation, "oauth2/v0/token")
             ContentType = "application/x-www-form-urlencoded"
+            TimeoutSec = if ($SystemParams.request_timeout_seconds) { [int]$SystemParams.request_timeout_seconds } else { 100 }
         }
 
         if($SystemParams.use_proxy) {
@@ -3365,6 +3373,7 @@ function Execute-Request {
         }
         Method = $Method
         Uri    = ("https://{0}/{1}" -f $SystemParams.geolocation, $Uri)
+        TimeoutSec = if ($SystemParams.request_timeout_seconds) { [int]$SystemParams.request_timeout_seconds } else { 100 }
     }
  
     if ($Body) {
@@ -3413,7 +3422,8 @@ function Execute-Request {
     do {
         # Add cursor to query string if present
         if ($cursor) {
-            $splat.Uri = if ($baseUri -match '\?') { "$($baseUri)&cursor=$cursor" } else { "$($baseUri)?cursor=$cursor" }
+            $encodedCursor = [Uri]::EscapeDataString($cursor)
+            $splat.Uri = if ($baseUri -match '\?') { "$($baseUri)&cursor=$encodedCursor" } else { "$($baseUri)?cursor=$encodedCursor" }
         }
 
         $attempt = 0
@@ -3428,12 +3438,13 @@ function Execute-Request {
                 break
             }
             catch {
-                $statusCode = $_.Exception.Response.StatusCode.value__
+                $errorRecord = $_
+                $statusCode = $errorRecord.Exception.Response.StatusCode.value__
 
                 switch ($statusCode) {
 
-                    403 {
-                        if($LoggingEnabled) { Log warning "Received 403 Forbidden. Attempting reauthentication..." }
+                    { $_ -eq 401 -or $_ -eq 403 } {
+                        if($LoggingEnabled) { Log warning "Received $statusCode. Attempting reauthentication..." }
 
                         # Re-authenticate
                         Execute-Authorization $SystemParams
@@ -3447,7 +3458,7 @@ function Execute-Request {
                             break
                         }
                         catch {
-                            throw "403 persisted after reauthentication. Aborting request."
+                            throw "$statusCode persisted after reauthentication. Aborting request."
                         }
                     }
 
@@ -3456,13 +3467,28 @@ function Execute-Request {
                         if ($attempt -ge $SystemParams.nr_of_retries) {
                             throw "Max retry attempts reached for $Uri"
                         }
+                        $retryAfter = $errorRecord.Exception.Response.Headers["Retry-After"]
+                        if ($retryAfter) {
+                            $retryAfterSeconds = 0
+                            if ([int]::TryParse($retryAfter, [ref]$retryAfterSeconds) -and $retryAfterSeconds -gt 0) {
+                                $retryDelay = $retryAfterSeconds
+                            } else {
+                                $retryAfterDate = [datetime]::MinValue
+                                if ([datetime]::TryParse($retryAfter, [ref]$retryAfterDate)) {
+                                    $retryAfterSeconds = [math]::Ceiling(($retryAfterDate.ToUniversalTime() - [datetime]::UtcNow).TotalSeconds)
+                                    if ($retryAfterSeconds -gt 0) {
+                                        $retryDelay = $retryAfterSeconds
+                                    }
+                                }
+                            }
+                        }
                         if($LoggingEnabled) { Log warning "Received 429. Retrying in $retryDelay seconds..." }
                         Start-Sleep -Seconds $retryDelay
                         $retryDelay *= 2
                     }
 
                     default {
-                        throw $_
+                        throw $errorRecord
                     }
                 }
             }
@@ -3638,32 +3664,7 @@ function Get-ProvisioningStatus {
 
 $configScenarios = @'
 [{"name":"Default Configuration","description":"","version":"1.0","createTime":1777063702449,"modify
-Time":1777063702449,"name_values":[{"name":"access_token","value":{"type":"crypto_aes","data":"ty3Bl
-U0jWL8gqxC23/xlgpkPsuKpnBLkuVsZfL77IsToyxVYpchk1pTxhNs5LNaMo/tfCtiqxb9f2ws4mIKCMV02Fd7w0WA0cg3KqClqf
-RiNI6yYOfwMnB6NuCWODFh0xcqXB+qQ1HYRHvRmGB3WuPfRnGpeWGOMYsLYw+5mB8/9vhhq0T6HEWMNJ9DRu8zTXcU21QZgRPPrO
-Aq7HGv6Z0gkFvVmL/kUhF/ZTRp8Q2A6OI0qIQsQ1LFLb9YDeIjNTzBrC5JDo6bGSf6V9WgZj3vKvSa9eOir35e11p//AdqXy38NS
-yGOJxMVkHAAqqp+i/wnHoXE/WMYugdCeF1bKTzs8j8VvZxFP2jj0gU/Y3jmyYRgkT5GwNmmGk6ghkYDZYAfkz7ugUHvUfAhVx6Qp
-VGtA9eGx4NVX7FJMHeNE/6c0a1XSHy4zpnCR/BWlPQePljhmvPpjHSz+Ci0tiyU+VeJwEug17j1gPXD7a5M2mK9+uwZrZwA045rr
-TIsxuow2kplHp6yWPo3Y3Cmf/1mPlDDDciLUntmlMLRpeQS7y5tNdXxXwyPUpd8mkxDMHwVr8cAOjVJaVxETHsp7UN09xJFVMgeV
-vXq7ghImenbhxP8X3MnkCyy8upxVObqPnGEw+wMM/rKbMePqTcS4I/iqCF0Jhlmbhl2V2qX+5m2m8N7FqP1Aks8NXk83fWLJtWJD
-If7puW2fzIA1RaDI9tSi4i9C6FRRr5QbObSSsRMVEI2CMb8BS4SFs8QoRIa/aTRdgySyQN28HDs+p5VAlhGxaVxQ2bK0vBBvZyzF
-kSXnvQevxH+Cj4naz83auDeqrYorwuH3tBWD2vZShKAvoFIRPl9ogI4jDGFUrah/1hl2FEQuWxdfs3q1X1Ah81z5X2jDYHafKovZ
-+5Ayy9RNCZ207MCv8UOHCi3O/l9rW2cLSSTqbqSLvZJBTxNrOwSD9vliARWFEtnBsIIxINBdMw8v0Pk78mzibGBJ+kr3+UuyaMda
-qTnj39v9YjOFtZyF9/GtyHpVBuUQhixFZplc3UmhYHXNOWyF2/ih8kxkMQu3+rEfjziqISWCjoN49eXMPq0FpdRzJ7LIFS4xsszF
-hEAnTMV1xdwBZTvSlPm5FEysamn5DMeieEqPHNyXEHmnqwfkmsfAwr9llT6FKwPocYq2d0UuRDzSf741q26muKjcnUqdtR8v9mNb
-MWRi7kNx7rFnKIHnfqIC26rqzQQopSabShfQgJ0Gf2G9AWRjA8vPuz66XFoRv0z06T1Qv1MgSRhqrfXtIds/E7kX0ADvCUxCjfzJ
-t5tOoFSXxsd1vJctQ6fscSGJk7LO4gnwYCXMYd98UPVezLNRaeTvxOsO+yImbXaWKIuUTN/3jm5PGrTqH3rAoDhKmCixlO0plv1C
-J+0Lfk7YjZgUFXUSQSaXK+nKK4H1AwM3Hgcxf3WCnKWpNww2oQYPlnjeKw/sghvc42Nkulx5Fi024fqk2+/XW6CrSzJpdJA6EQar
-pchhnxQkEsldWHFvKxjU0FWVlEpEfwc7L77dkHCpjF58JuTYtwXXwKtUYm3wLpmNY7RlHYjeuvd69k8mpq9YY1VxD9WAZLI74tSj
-0nJEiK7Pc42reb2YcySJnFvy9ozOoSx6obWHfyWcloZXj5bGSiqZqSWuA3YsQMKJY0203hegrqMD6f5xl9D+rb8cCyDhiwVCbjCB
-seSKTLVuurDs0C0Pe2pGooVOtYjwGEpwaPjWZ3i764nGydf44yDUoXr4NyTNKyDeCxe8BVpCUIuFdepq6EEyp6iglg/XlXu29HRO
-LgEnoogKY7AEWUF3eHk02KCcT+8gXUCOI+/dWY0ms/x9DikhBLhD8K86KR2WA3xRZTM4xhcZAnVwBTfmwZ3gLJhZcBcuvtCl7F0q
-Or8e4+UAu3ctONhqV6dSjOP2OIVCcHuU2pqtquxrAJtCv0BzUNCNxPjzfi8ZeVG5JWgND9ce7qcclHkbxYvagFTDOPhSjmLkTE+2
-TYhNPcmaMwYcYhWGyLArSfE3oTrbQ8oECMq2aO2DbIh6buJvmNd33/WrTGzfW8fYRKlRHf8iulIHKaXuQdRZO/nK1hJPfG57NpHx
-HVQdXiPiYJ4UFh4CCHQd0nEcxI1uAts7Z2e2zs8XtKD1iY4RReceHwFrS5mDX5qElPgv+VE90VSof1XlgOetHi2j1t6ssGvMQDEj
-f/tQRmkwhpBNDUOTcM7PZYj6nYeKbqK0XA2Cpnmpyxu58i5SHj2ATRB150neUZ+C6pl6Vm47pUKSb5+vGnrIsa1Vn7ndvpLe7ree
-aDz4w90qVvrLlAGNBC1QW4FPII6//J6WTCQUj8SL950licKA6wrpiZJfGGqfT0/IhZhiIdTk3FxglS+AOLSiMXy1BGoGtSveZe9F
-6P7e3YcQkUKF7p/nxWJMxiLW1DwwYfBsFQ=","tag":"pGO8w8l0TUDXK/ZkzwGVoA=="}},{"name":"client_id","value":
+Time":1777063702449,"name_values":[{"name":"access_token","value": null},{"name":"client_id","value":
 null},{"name":"client_secret","value":null},{"name":"collections","value":["formFields","identity_us
 ers_addresses","identity_users_emails","identity_users_emergencyContacts","identity_users_phoneNumbe
 rs","identity_users","roles","spend_users_approverLimit","spend_users_approver","spend_users_customD
