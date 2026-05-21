@@ -5,7 +5,6 @@ $Log_MaskableKeys = @(
     'Password',
     'proxy_password',
     'access_token',
-    'company_request_token',
     'client_secret',
     'refresh_token'
 )
@@ -220,17 +219,7 @@ function Idm-SystemInfo {
                 label_indent = $true
                 tooltip = 'Use the Concur SAP Company Request Token Self-Service Tool to get this information. A refresh token has a six month lifetime'
                 value = ''
-                require = $true
-            }
-            @{
-                name = 'company_request_token'
-                type = 'textbox'
-                password = $true
-                label = 'Company Request Token'
-                label_indent = $true
-                tooltip = 'Use the Concur SAP Company Request Token Self-Service Tool to get this information. A refresh token has a six month lifetime'
-                value = ''
-                require = $true
+                require = $false
             }
             @{
                 name = 'client_id'
@@ -1498,7 +1487,8 @@ function Idm-spend_usersRead {
             # Prepare runspace pool
             $cancellationSource = [System.Threading.CancellationTokenSource]::new()
 
-            $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+            $threadCount = Get-IntSetting -Settings $system_params -Name 'nr_of_threads' -Default 20 -Minimum 1 -Maximum 50
+            $runspacePool = [runspacefactory]::CreateRunspacePool(1, $threadCount)
             $runspacePool.Open()
             $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
@@ -2302,9 +2292,6 @@ function Idm-spend_users_approverAdd {
 
 
 
-        # Get User
-        $uri = 
-
         $splat = @{
             SystemParams = $system_params
             Method = "GET"
@@ -2435,7 +2422,7 @@ function Idm-spend_users_approverRemove {
         
         $response = Execute-Request @splat
 
-        LogIO info "spendUserRoleRemove"
+        LogIO info "spendUserApproverRemove"
     }
     
     Log verbose "Done"
@@ -2747,7 +2734,8 @@ function Idm-travel_usersRead {
             # Prepare runspace pool
             $cancellationSource = [System.Threading.CancellationTokenSource]::new()
 
-            $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+            $threadCount = Get-IntSetting -Settings $system_params -Name 'nr_of_threads' -Default 20 -Minimum 1 -Maximum 50
+            $runspacePool = [runspacefactory]::CreateRunspacePool(1, $threadCount)
             $runspacePool.Open()
             $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
@@ -3197,7 +3185,7 @@ function Idm-travel_users_customFieldCreate {
         $response = Execute-Request @splat
     
         $function_params.nim_id = Get-ObjectHash -Object $function_params
-        LogIO info "travelUserCustomDataCreate" -out $function_params
+        LogIO info "travelUserCustomFieldCreate" -out $function_params
         $function_params
     }
     
@@ -3740,7 +3728,7 @@ null},{"name":"client_secret","value":null},{"name":"collections","value":["form
 ers_addresses","identity_users_emails","identity_users_emergencyContacts","identity_users_phoneNumbe
 rs","identity_users","roles","spend_users_approverLimit","spend_users_approver","spend_users_customD
 atas","spend_users_delegate","spend_users_roles","spend_users","spendCategoryCodes","travel_users_cu
-stomFields","travel_users"]},{"name":"company_request_token","value":null},{"name":"company_uuid","v
+stomFields","travel_users"]},{"name":"company_uuid","v
 alue":null},{"name":"geolocation","value":null},{"name":"nr_of_retries","value":null},{"name":"nr_of
 _sessions","value":null},{"name":"nr_of_threads","value":null},{"name":"proxy_address","value":null}
 ,{"name":"proxy_password","value":null},{"name":"proxy_username","value":null},{"name":"refresh_toke
