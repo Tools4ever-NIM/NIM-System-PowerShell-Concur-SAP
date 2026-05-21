@@ -1505,12 +1505,20 @@ function Idm-spend_usersRead {
             # Index for tracking
             $index = 0
 
+            $funcDef0 = "function Get-IntSetting { $((Get-Command Get-IntSetting -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef = "function Execute-Request { $((Get-Command Execute-Request -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef2 = "function Execute-Authorization { $((Get-Command Execute-Authorization -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef3 = "function Initialize-Proxy { $((Get-Command Initialize-Proxy -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef4 = "function Resolve-NestedValue { $((Get-Command Resolve-NestedValue -CommandType Function).ScriptBlock.ToString()) }"
 
-            # Capture once — stable for the entire sync
+            # Refresh once before fan-out so worker runspaces start with a valid token.
+            if (-not $Global:ProxyInitialized) {
+                Initialize-Proxy -SystemParams $system_params
+                $Global:ProxyInitialized = $true
+            }
+            Execute-Authorization -SystemParams $system_params
+
+            # Capture once - stable for the entire sync
             $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
             $authTokenSnapshot       = $Global:AuthToken
             $proxyInitializedSnapshot = $Global:ProxyInitialized
@@ -1518,7 +1526,7 @@ function Idm-spend_usersRead {
             foreach ($item in $Global:IdentityUsers) {
                 $runspace = [powershell]::Create()
 
-                [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript($funcDef3).AddScript($funcDef4).AddScript({
+                [void]$runspace.AddScript($funcDef0).AddScript($funcDef).AddScript($funcDef2).AddScript($funcDef3).AddScript($funcDef4).AddScript({
                     param($item, $system_params, $Class, $template, $index, $properties, $propertiesHT, $proxy, $authToken, $proxyInitialized)
 
                     $Global:Proxy            = $proxy
@@ -2746,12 +2754,20 @@ function Idm-travel_usersRead {
             # Index for tracking
             $index = 0
 
+            $funcDef0 = "function Get-IntSetting { $((Get-Command Get-IntSetting -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef = "function Execute-Request { $((Get-Command Execute-Request -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef2 = "function Execute-Authorization { $((Get-Command Execute-Authorization -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef3 = "function Initialize-Proxy { $((Get-Command Initialize-Proxy -CommandType Function).ScriptBlock.ToString()) }"
             $funcDef4 = "function Resolve-NestedValue { $((Get-Command Resolve-NestedValue -CommandType Function).ScriptBlock.ToString()) }"
 
-            # Capture once — stable for the entire sync
+            # Refresh once before fan-out so worker runspaces start with a valid token.
+            if (-not $Global:ProxyInitialized) {
+                Initialize-Proxy -SystemParams $system_params
+                $Global:ProxyInitialized = $true
+            }
+            Execute-Authorization -SystemParams $system_params
+
+            # Capture once - stable for the entire sync
             $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
             $authTokenSnapshot       = $Global:AuthToken
             $proxyInitializedSnapshot = $Global:ProxyInitialized
@@ -2759,7 +2775,7 @@ function Idm-travel_usersRead {
             foreach ($item in $Global:IdentityUsers) {
                 $runspace = [powershell]::Create()
 
-                [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript($funcDef3).AddScript($funcDef4).AddScript({
+                [void]$runspace.AddScript($funcDef0).AddScript($funcDef).AddScript($funcDef2).AddScript($funcDef3).AddScript($funcDef4).AddScript({
                     param($item, $system_params, $Class, $template, $index, $properties, $propertiesHT, $proxy, $authToken, $proxyInitialized)
 
                     $Global:Proxy            = $proxy
@@ -3313,10 +3329,36 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 
 }
 
+function Get-IntSetting {
+    param (
+        [hashtable] $Settings,
+        [string] $Name,
+        [int] $Default,
+        [int] $Minimum = 1,
+        [int] $Maximum = [int]::MaxValue
+    )
+
+    $value = $null
+    if ($null -ne $Settings -and $Settings.ContainsKey($Name)) {
+        $value = $Settings[$Name]
+    }
+
+    $parsed = 0
+    if ($null -eq $value -or -not [int]::TryParse(([string]$value), [ref]$parsed)) {
+        $parsed = $Default
+    }
+
+    if ($parsed -lt $Minimum) { return $Minimum }
+    if ($parsed -gt $Maximum) { return $Maximum }
+    return $parsed
+}
+
 function Execute-Authorization {
     param (
         [hashtable] $SystemParams
     )
+
+        $requestTimeoutSeconds = Get-IntSetting -Settings $SystemParams -Name 'request_timeout_seconds' -Default 100 -Minimum 1 -Maximum 3600
 
         $splat = @{
             Headers = @{
@@ -3331,7 +3373,7 @@ function Execute-Authorization {
             Method = 'POST'
             Uri = ("https://{0}/{1}" -f $SystemParams.geolocation, "oauth2/v0/token")
             ContentType = "application/x-www-form-urlencoded"
-            TimeoutSec = if ($SystemParams.request_timeout_seconds) { [int]$SystemParams.request_timeout_seconds } else { 100 }
+            TimeoutSec = $requestTimeoutSeconds
         }
 
         if($SystemParams.use_proxy) {
@@ -3364,6 +3406,10 @@ function Execute-Request {
         Execute-Authorization $SystemParams
     }
 
+    $requestTimeoutSeconds = Get-IntSetting -Settings $SystemParams -Name 'request_timeout_seconds' -Default 100 -Minimum 1 -Maximum 3600
+    $maxRetries = Get-IntSetting -Settings $SystemParams -Name 'nr_of_retries' -Default 5 -Minimum 1 -Maximum 20
+    $defaultRetryDelay = Get-IntSetting -Settings $SystemParams -Name 'retryDelay' -Default 2 -Minimum 1 -Maximum 3600
+
     # Build base request
     $splat = @{
         Headers = @{
@@ -3373,7 +3419,7 @@ function Execute-Request {
         }
         Method = $Method
         Uri    = ("https://{0}/{1}" -f $SystemParams.geolocation, $Uri)
-        TimeoutSec = if ($SystemParams.request_timeout_seconds) { [int]$SystemParams.request_timeout_seconds } else { 100 }
+        TimeoutSec = $requestTimeoutSeconds
     }
  
     if ($Body) {
@@ -3393,10 +3439,22 @@ function Execute-Request {
         # Ensure Body is a hashtable before treating it as query params
         if ($Body -is [hashtable]) {
 
-            $queryString = (
-                $Body.GetEnumerator() |
-                ForEach-Object { "$($_.Key)=$([Uri]::EscapeDataString($_.Value))" }
-            ) -join "&"
+            $queryParts = [System.Collections.Generic.List[string]]::new()
+            foreach ($entry in $Body.GetEnumerator()) {
+                if ($null -eq $entry.Value) { continue }
+
+                $encodedKey = [Uri]::EscapeDataString([string]$entry.Key)
+                if ($entry.Value -is [System.Array]) {
+                    foreach ($value in $entry.Value) {
+                        if ($null -eq $value) { continue }
+                        $queryParts.Add(("{0}={1}" -f $encodedKey, [Uri]::EscapeDataString([string]$value)))
+                    }
+                } else {
+                    $queryParts.Add(("{0}={1}" -f $encodedKey, [Uri]::EscapeDataString([string]$entry.Value)))
+                }
+            }
+
+            $queryString = $queryParts -join "&"
 
             if ($queryString.Length -gt 0) {
                 if ($splat.Uri -notmatch "\?") {
@@ -3427,7 +3485,7 @@ function Execute-Request {
         }
 
         $attempt = 0
-        $retryDelay = $SystemParams.retryDelay
+        $retryDelay = $defaultRetryDelay
 
         do {
             try {
@@ -3446,8 +3504,21 @@ function Execute-Request {
                     { $_ -eq 401 -or $_ -eq 403 } {
                         if($LoggingEnabled) { Log warning "Received $statusCode. Attempting reauthentication..." }
 
-                        # Re-authenticate
-                        Execute-Authorization $SystemParams
+                        # Re-authenticate under a process-wide lock to avoid runspace refresh stampedes.
+                        $authRefreshMutex = New-Object System.Threading.Mutex($false, "NIMConcurSapAuthRefresh")
+                        $authRefreshLockAcquired = $false
+                        try {
+                            $authRefreshLockAcquired = $authRefreshMutex.WaitOne(($requestTimeoutSeconds * 1000))
+                            if (-not $authRefreshLockAcquired) {
+                                throw "Timed out waiting for token refresh lock."
+                            }
+                            Execute-Authorization $SystemParams
+                        } finally {
+                            if ($authRefreshLockAcquired) {
+                                $authRefreshMutex.ReleaseMutex()
+                            }
+                            $authRefreshMutex.Dispose()
+                        }
 
                         # Update Authorization header with new token
                         $splat.Headers["Authorization"] = ("Bearer {0}" -f $Global:AuthToken)
@@ -3464,7 +3535,7 @@ function Execute-Request {
 
                     429 {
                         $attempt++
-                        if ($attempt -ge $SystemParams.nr_of_retries) {
+                        if ($attempt -ge $maxRetries) {
                             throw "Max retry attempts reached for $Uri"
                         }
                         $retryAfter = $errorRecord.Exception.Response.Headers["Retry-After"]
@@ -3629,7 +3700,7 @@ function Get-ProvisioningStatus {
         if ($null -ne $ProvisionStatus.meta.location) {
             $provisionUri = ([Uri]$ProvisionStatus.meta.location).PathAndQuery.TrimStart('/')
             $maxAttempts  = 30
-            $pollInterval = [int]$SystemParams.retryDelay
+            $pollInterval = Get-IntSetting -Settings $SystemParams -Name 'retryDelay' -Default 2 -Minimum 1 -Maximum 3600
 
             for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
                 if ($attempt -gt 1) { Start-Sleep -Seconds $pollInterval }
