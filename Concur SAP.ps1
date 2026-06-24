@@ -1601,7 +1601,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:User'.customData) {
                             [void]$Global:SpendUsers_CustomData.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 id = $subItem.id
                                 value = $subItem.Value
@@ -1615,7 +1615,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.report) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'report'
@@ -1627,7 +1627,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.cashAdvance.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.cashAdvance) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'cashAdvance'
@@ -1639,7 +1639,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.request.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.request) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'request'
@@ -1651,7 +1651,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.invoice.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.invoice) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'invoice'
@@ -1663,7 +1663,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.purchaseRequest.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.purchaseRequest) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'purchaseRequest'
@@ -1675,7 +1675,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.statement.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.statement) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'statement'
@@ -1687,7 +1687,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.budget.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Approver'.budget) {
                             [void]$Global:SpendUsers_Approver.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 approver_value = $subItem.approver.value
                                 approval_type = 'budget'
@@ -1700,7 +1700,7 @@ function Idm-spend_usersRead {
                     foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:ApproverLimit'.PSObject.Properties) {
                         foreach($subItem in $prop.Value) {
                             [void]$Global:SpendUsers_ApproverLimit.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 type = $prop.Name
                                 approvalGroup = $subItem.approvalGroup
@@ -1716,7 +1716,7 @@ function Idm-spend_usersRead {
                     foreach($prop in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Delegate'.PSObject.Properties) {
                         foreach($subItem in $prop.Value) {
                             [void]$Global:SpendUsers_Delegate.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 type = $prop.Name
                                 canApprove = $subItem.canApprove
@@ -1737,7 +1737,7 @@ function Idm-spend_usersRead {
                     if($item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles.length -gt 0) {
                         foreach($subItem in $item.'urn:ietf:params:scim:schemas:extension:spend:2.0:Role'.roles) {
                             [void]$Global:SpendUsers_Roles.Add([PSCustomObject]@{
-                                nim_id = Get-ObjectHash -Object $subItem
+                                nim_id = Get-ObjectHash -Object ($subItem | Select-Object *, @{Name='spendUser_id'; Expression={$item.id}})
                                 spendUser_id = $item.id
                                 roleName = $subItem.roleName
                                 roleGroups = $subItem.roleGroups
